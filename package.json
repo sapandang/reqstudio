@@ -1,0 +1,76 @@
+{
+  "name": "reqstudio",
+  "displayName": "reqstudio - Visual API & REST Client",
+  "description": "A powerful HTTP and REST API client inside VS Code. An intuitive, open-source extension for testing and managing API requests in .req files.",
+  "version": "1.0.0",
+  "publisher": "sapandang",
+  "license": "MIT",
+  "icon": "logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sapandang/reqstudio.git"
+  },
+  "engines": {
+    "vscode": "^1.103.0"
+  },
+  "categories": [
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "api",
+    "rest",
+    "http",
+    "client",
+    "testing",
+    "request",
+    "runner",
+    "req",
+    "gui"
+  ],
+  "activationEvents": [
+    "onCustomEditor:req-studio-ui.reqCustomEditor"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+    ],
+    "customEditors": [
+      {
+        "viewType": "req-studio-ui.reqCustomEditor",
+        "displayName": "REQ studio UI",
+        "selector": [
+          {
+            "filenamePattern": "*.req"
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/form-data": "^2.5.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/node-fetch": "^2.6.13",
+    "@types/vscode": "^1.103.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.32.0",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@vscode-elements/elements": "^2.1.0",
+    "form-data": "^4.0.4",
+    "node-fetch": "^3.3.2"
+  }
+}
