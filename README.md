@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![VS Code Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/sapandang.reqstudio.svg)](https://marketplace.visualstudio.com/items?itemName=sapandang.reqstudio)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/your-username/reqstudio/main.yml?branch=main)](https://github.com/your-username/reqstudio/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/your-username/reqstudio/main.yml?branch=main)](https://github.com/sapandang/reqstudio/actions)
 
 **reqstudio** is a powerful, open-source HTTP and REST API client that lives directly inside Visual Studio Code. It provides a rich, graphical interface for creating, sending, and testing API requests, all managed through simple, text-based `.req` files.
 
