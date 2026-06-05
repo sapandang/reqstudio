@@ -241,11 +241,12 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                 const controller = new AbortController();
                 this._activeControllers.set(webviewPanel, controller);
 
+                const timeoutMs = vscode.workspace.getConfiguration('reqstudio').get<number>('requestTimeout', 30000);
                 let timedOut = false;
                 const timeoutId = setTimeout(() => {
                     timedOut = true;
                     controller.abort();
-                }, 30000);
+                }, timeoutMs);
 
                 try {
                     const { body: processedBody, headers: finalHeaders } = await this.prepareBodyAndHeaders(message);
@@ -277,7 +278,7 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                     console.error('[REQ-STUDIO] Fetch Error:', err);
                     if (err.name === 'AbortError') {
                         if (timedOut) {
-                            webviewPanel.webview.postMessage({ command: 'response-error', message: 'Request timed out after 30 seconds.' });
+                            webviewPanel.webview.postMessage({ command: 'response-error', message: `Request timed out after ${timeoutMs / 1000} seconds.` });
                         } else {
                             webviewPanel.webview.postMessage({ command: 'response-cancelled' });
                         }

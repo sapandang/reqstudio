@@ -33,6 +33,16 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "REQ Studio",
+      "properties": {
+        "reqstudio.requestTimeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Request timeout in milliseconds (default: 30000)."
+        }
+      }
+    },
     "commands": [
     ],
     "customEditors": [
