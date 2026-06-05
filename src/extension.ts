@@ -186,7 +186,14 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                         }
                     }
                 }
-                finalHeaders = { ...headers, ...form.getHeaders() };
+                // Remove any user-set Content-Type so the generated boundary wins
+                const cleanedHeaders: Record<string, string> = {};
+                for (const [k, v] of Object.entries(headers ?? {})) {
+                    if (k.toLowerCase() !== 'content-type') {
+                        cleanedHeaders[k] = v as string;
+                    }
+                }
+                finalHeaders = { ...cleanedHeaders, ...form.getHeaders() };
                 processedBody = await form.getBuffer();
             }
         }

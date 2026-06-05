@@ -1,0 +1,17 @@
+{
+  "method": "GET",
+  "url": "{{URL}}/api/test",
+  "params": [],
+  "headers": [],
+  "bodyType": "none",
+  "bodyText": "",
+  "bodyUrlEncoded": [],
+  "bodyMultipart": [
+    {
+      "key": "",
+      "value": "",
+      "type": "text",
+      "enabled": true
+    }
+  ]
+}

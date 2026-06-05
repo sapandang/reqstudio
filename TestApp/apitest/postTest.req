@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "url": "{{URL}}/api/test",
+  "params": [],
+  "headers": [],
+  "bodyType": "application/octet-stream",
+  "bodyText": "dfsd",
+  "bodyUrlEncoded": [],
+  "bodyMultipart": [
+    {
+      "key": "",
+      "value": "",
+      "type": "text",
+      "enabled": true
+    }
+  ]
+}

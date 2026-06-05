@@ -1,0 +1,35 @@
+{
+  "method": "POST",
+  "url": "{{URL}}/api/upload/mixed",
+  "params": [],
+  "headers": [],
+  "bodyType": "multipart/form-data",
+  "bodyText": "",
+  "bodyUrlEncoded": [
+    {
+      "key": "sdas",
+      "value": "asdas",
+      "enabled": true
+    }
+  ],
+  "bodyMultipart": [
+    {
+      "key": "sdas",
+      "value": "sdasd",
+      "type": "text",
+      "enabled": true
+    },
+    {
+      "key": "file",
+      "value": null,
+      "type": "file",
+      "enabled": true
+    },
+    {
+      "key": "fee",
+      "value": null,
+      "type": "file",
+      "enabled": true
+    }
+  ]
+}
