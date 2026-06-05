@@ -11,13 +11,4 @@ vsc-extension-quickstart.md
 **/.vscode-test.*
 media/node_modules/
 TestApp/
-node_modules/
-media/*.vue
-media/main.js
-media/package.json
-media/package-lock.json
-media/vite.config.js
-media/tailwind.config.js
-media/tailwind.css
-media/.gitignore
 reqstudio.png
