@@ -5,7 +5,6 @@
                 <vscode-option value="">-- No Env --</vscode-option>
                 <vscode-option v-for="env in environments" :key="env.file" :value="env.file">{{ env.name }}</vscode-option>
             </vscode-single-select>
-            <vscode-button @click="saveRequest">Save</vscode-button>
         </div>
         <vscode-split-layout class="h-full grow">
             <div slot="start" class="flex flex-col gap-2">
