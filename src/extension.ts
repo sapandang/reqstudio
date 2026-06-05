@@ -30,7 +30,28 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
     private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<vscode.CustomDocumentEditEvent<ReqDocument>>();
     public readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
 
+    private readonly _activeControllers = new Map<vscode.WebviewPanel, AbortController>();
+    private readonly _requestGenerations = new Map<vscode.WebviewPanel, number>();
+
     constructor(private readonly context: vscode.ExtensionContext) { }
+
+    private _cancelPendingRequest(panel: vscode.WebviewPanel): void {
+        const controller = this._activeControllers.get(panel);
+        if (controller) {
+            controller.abort();
+            this._activeControllers.delete(panel);
+        }
+    }
+
+    private _nextGeneration(panel: vscode.WebviewPanel): number {
+        const next = (this._requestGenerations.get(panel) || 0) + 1;
+        this._requestGenerations.set(panel, next);
+        return next;
+    }
+
+    private _isStale(panel: vscode.WebviewPanel, generation: number): boolean {
+        return (this._requestGenerations.get(panel) || 0) !== generation;
+    }
     
     // saveCustomDocumentAs, revertCustomDocument, backupCustomDocument, openCustomDocument (No changes)
     async saveCustomDocumentAs(document: ReqDocument, destination: vscode.Uri, cancellation: vscode.CancellationToken): Promise<void> {
@@ -103,34 +124,73 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
 
         webviewPanel.webview.postMessage({ command: 'load-request', data: document.documentData });
 
+        webviewPanel.onDidDispose(() => {
+            this._cancelPendingRequest(webviewPanel);
+            this._requestGenerations.delete(webviewPanel);
+        });
+
         webviewPanel.webview.onDidReceiveMessage(async (message) => {
             console.log('[REQ-STUDIO] Received message:', message);
             if (message.command === 'send-request') {
                 const { method, url } = message;
+
+                const generation = this._nextGeneration(webviewPanel);
+                this._cancelPendingRequest(webviewPanel);
+
+                const controller = new AbortController();
+                this._activeControllers.set(webviewPanel, controller);
+
+                let timedOut = false;
+                const timeoutId = setTimeout(() => {
+                    timedOut = true;
+                    controller.abort();
+                }, 30000);
+
                 try {
                     const { body: processedBody, headers: finalHeaders } = await this.prepareBodyAndHeaders(message);
-                    
+
                     const res = await fetch(url, {
                         method,
                         headers: finalHeaders,
-                        body: method === 'GET' ? undefined : processedBody
+                        body: method === 'GET' ? undefined : processedBody,
+                        signal: controller.signal
                     }) as Response;
-                    
+
+                    if (this._isStale(webviewPanel, generation)) { return; }
+
                     webviewPanel.webview.postMessage({ command: 'response-start', status: res.status, statusText: res.statusText, headers: Object.fromEntries(res.headers.entries()) });
 
                     if (res.body) {
                         for await (const chunk of res.body) {
+                            if (this._isStale(webviewPanel, generation)) { return; }
                             webviewPanel.webview.postMessage({ command: 'response-chunk', chunk: (chunk as Buffer).toString('base64') });
                         }
                     }
-                    
+
+                    if (this._isStale(webviewPanel, generation)) { return; }
                     webviewPanel.webview.postMessage({ command: 'response-end' });
 
                 } catch (err: any) {
+                    if (this._isStale(webviewPanel, generation)) { return; }
+
                     console.error('[REQ-STUDIO] Fetch Error:', err);
-                    // ** THE FIX IS HERE **
-                    webviewPanel.webview.postMessage({ command: 'response', response: 'Error: ' + err.message, status: 0, statusText: 'Error' });
+                    if (err.name === 'AbortError') {
+                        if (timedOut) {
+                            webviewPanel.webview.postMessage({ command: 'response-error', message: 'Request timed out after 30 seconds.' });
+                        } else {
+                            webviewPanel.webview.postMessage({ command: 'response-cancelled' });
+                        }
+                    } else {
+                        webviewPanel.webview.postMessage({ command: 'response-error', message: 'Error: ' + err.message });
+                    }
+                } finally {
+                    clearTimeout(timeoutId);
+                    if (!this._isStale(webviewPanel, generation)) {
+                        this._activeControllers.delete(webviewPanel);
+                    }
                 }
+            } else if (message.command === 'cancel-request') {
+                this._cancelPendingRequest(webviewPanel);
             } else if (message.command === 'save-request') {
                 document.update(message.data);
                 this._onDidChangeCustomDocument.fire({ document, undo: () => {}, redo: () => {} });

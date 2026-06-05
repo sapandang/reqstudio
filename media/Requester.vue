@@ -14,7 +14,8 @@
                         <vscode-option value="DELETE">DELETE</vscode-option>
                     </vscode-single-select>
                     <vscode-textfield v-model="url" placeholder="http://localhost:3000" class="grow"></vscode-textfield>
-                    <vscode-button @click="sendRequest">Send</vscode-button>
+                    <vscode-button v-if="!isSending" @click="sendRequest">Send</vscode-button>
+                    <vscode-button v-else @click="cancelRequest" appearance="secondary">Cancel</vscode-button>
                 </div>
 
                 <div class="flex flex-row h-full">
@@ -141,10 +142,11 @@ const bodyUrlEncoded = ref([{ key: '', value: '', enabled: true }]);
 const bodyMultipart = ref([{ key: '', value: '', type: 'text', enabled: true }]);
 const bodyBinaryFile = ref(null); // Will hold { name, size, base64content }
 
-const responseBody = ref('');
-const responseHeaders = ref(null);
-const statusCode = ref(null);
-const responseTime = ref(null);
+    const responseBody = ref('');
+    const responseHeaders = ref(null);
+    const statusCode = ref(null);
+    const responseTime = ref(null);
+    const isSending = ref(false);
 
     let vscode;
     let requestStartTime = null;
@@ -195,12 +197,28 @@ onMounted(() => {
                 for (const arr of chunkBuffers) { all.set(arr, offset); offset += arr.length; }
                 responseBody.value = tryDecodeToString(all);
                 if (requestStartTime) { responseTime.value = Math.round(performance.now() - requestStartTime); }
+                isSending.value = false;
                 break;
             case 'response':
                 statusCode.value = message.status;
                 responseBody.value = message.response;
                 responseHeaders.value = message.headers || null;
                 if (requestStartTime) { responseTime.value = Math.round(performance.now() - requestStartTime); }
+                isSending.value = false;
+                break;
+            case 'response-cancelled':
+                responseBody.value = 'Request cancelled.';
+                responseHeaders.value = null;
+                statusCode.value = null;
+                responseTime.value = null;
+                isSending.value = false;
+                break;
+            case 'response-error':
+                responseBody.value = message.message;
+                responseHeaders.value = null;
+                statusCode.value = null;
+                responseTime.value = null;
+                isSending.value = false;
                 break;
         }
     });
@@ -302,12 +320,20 @@ function saveRequest() {
     }
 }
 
+function cancelRequest() {
+    if (vscode) {
+        vscode.postMessage({ command: 'cancel-request' });
+    }
+}
+
 // --- Main Send Request Logic ---
 async function sendRequest() {
     if (!vscode) {
         responseBody.value = 'Error: VS Code API not available.';
         return;
     }
+
+    isSending.value = true;
 
     // 1. Build URL with params (no changes here)
     let reqUrl = url.value;
