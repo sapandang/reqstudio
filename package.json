@@ -2,7 +2,7 @@
   "name": "reqstudio",
   "displayName": "reqstudio - Visual API & REST Client",
   "description": "A powerful HTTP and REST API client inside VS Code. An intuitive, open-source extension for testing and managing API requests in .req files.",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "publisher": "sapandang",
   "license": "MIT",
   "icon": "logo.png",
@@ -15,7 +15,9 @@
   },
   "categories": [
     "Testing",
-    "Other"
+    "Other",
+    "Snippets",
+    "Programming Languages"
   ],
   "keywords": [
     "api",
@@ -26,7 +28,19 @@
     "request",
     "runner",
     "req",
-    "gui"
+    "gui",
+    "http client",
+    "rest client",
+    "api testing",
+    "http request",
+    "rest api",
+    "api client",
+    "api management",
+    "api development",
+    "api testing tool",
+    "thunderclient",
+    "insomnia",
+    "postman"
   ],
   "activationEvents": [
     "onCustomEditor:req-studio-ui.reqCustomEditor"
