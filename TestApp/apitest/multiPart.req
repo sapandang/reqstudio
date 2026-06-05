@@ -1,0 +1,35 @@
+{
+  "method": "POST",
+  "url": "{{URL}}/api/upload/multiple",
+  "params": [],
+  "headers": [],
+  "bodyType": "multipart/form-data",
+  "bodyText": "",
+  "bodyUrlEncoded": [
+    {
+      "key": "sdas",
+      "value": "asdas",
+      "enabled": true
+    }
+  ],
+  "bodyMultipart": [
+    {
+      "key": "dummy",
+      "value": "hello",
+      "type": "text",
+      "enabled": true
+    },
+    {
+      "key": "files",
+      "value": null,
+      "type": "file",
+      "enabled": true
+    },
+    {
+      "key": "file2",
+      "value": null,
+      "type": "file",
+      "enabled": true
+    }
+  ]
+}

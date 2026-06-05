@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import FormData from 'form-data';
 import fetch, { Response } from 'node-fetch';
 
@@ -30,7 +31,117 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
     private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<vscode.CustomDocumentEditEvent<ReqDocument>>();
     public readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
 
+    private readonly _activeControllers = new Map<vscode.WebviewPanel, AbortController>();
+    private readonly _requestGenerations = new Map<vscode.WebviewPanel, number>();
+    private readonly _panelEnvs = new Map<vscode.WebviewPanel, string>();
+
     constructor(private readonly context: vscode.ExtensionContext) { }
+
+    private _cancelPendingRequest(panel: vscode.WebviewPanel): void {
+        const controller = this._activeControllers.get(panel);
+        if (controller) {
+            controller.abort();
+            this._activeControllers.delete(panel);
+        }
+    }
+
+    private _nextGeneration(panel: vscode.WebviewPanel): number {
+        const next = (this._requestGenerations.get(panel) || 0) + 1;
+        this._requestGenerations.set(panel, next);
+        return next;
+    }
+
+    private _isStale(panel: vscode.WebviewPanel, generation: number): boolean {
+        return (this._requestGenerations.get(panel) || 0) !== generation;
+    }
+
+    private async _scanEnvFiles(reqUri: vscode.Uri): Promise<{ name: string; file: string }[]> {
+        const results: { name: string; file: string }[] = [];
+        const dir = path.dirname(reqUri.fsPath);
+        try {
+            const files = await fs.promises.readdir(dir);
+            for (const file of files) {
+                if (file.endsWith('.reqenv')) {
+                    const name = file === '.reqenv' ? 'default' : file.replace(/\.reqenv$/, '');
+                    results.push({ name, file: path.join(dir, file) });
+                }
+            }
+        } catch {
+            /* ignore read errors */
+        }
+        return results;
+    }
+
+    private _substituteEnvVars(text: string, env: Record<string, string>): string {
+        if (!text) { return text; }
+        return text.replace(/\{\{([^}]+)\}\}/g, (match, key) => env[key.trim()] ?? match);
+    }
+
+    private _parseEnvContent(content: string): Record<string, string> {
+        // Try JSON first
+        try {
+            return JSON.parse(content);
+        } catch {
+            /* ignore, fall through to dotenv parsing */
+        }
+
+        const env: Record<string, string> = {};
+        for (const line of content.split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) { continue; }
+            const eqIdx = trimmed.indexOf('=');
+            if (eqIdx === -1) { continue; }
+            const key = trimmed.slice(0, eqIdx).trim();
+            const value = trimmed.slice(eqIdx + 1).trim();
+            if (key) { env[key] = value; }
+        }
+        return env;
+    }
+
+    private async _applyEnvToMessage(message: any): Promise<void> {
+        const envFile = message.envFile as string | undefined;
+        if (!envFile) { return; }
+
+        let env: Record<string, string> = {};
+        try {
+            const content = await fs.promises.readFile(envFile, 'utf8');
+            env = this._parseEnvContent(content);
+        } catch {
+            return;
+        }
+
+        message.url = this._substituteEnvVars(message.url, env);
+
+        const newHeaders: Record<string, string> = {};
+        for (const [hKey, hVal] of Object.entries(message.headers ?? {})) {
+            newHeaders[this._substituteEnvVars(hKey, env)] = this._substituteEnvVars(hVal as string, env);
+        }
+        message.headers = newHeaders;
+
+        if (typeof message.body === 'string') {
+            message.body = this._substituteEnvVars(message.body, env);
+        } else if (message.body && typeof message.body === 'object' && message.body.type === 'multipart/form-data') {
+            for (const part of message.body.data ?? []) {
+                part.key = this._substituteEnvVars(part.key, env);
+                if (part.type === 'text' && typeof part.value === 'string') {
+                    part.value = this._substituteEnvVars(part.value, env);
+                }
+            }
+        }
+
+        if (Array.isArray(message.params)) {
+            const activeParams = message.params
+                .filter((p: any) => p.enabled && p.key)
+                .map((p: any) => [
+                    this._substituteEnvVars(p.key, env),
+                    this._substituteEnvVars(p.value, env)
+                ]);
+            if (activeParams.length > 0) {
+                const qs = new URLSearchParams(activeParams).toString();
+                message.url += (message.url.includes('?') ? '&' : '?') + qs;
+            }
+        }
+    }
     
     // saveCustomDocumentAs, revertCustomDocument, backupCustomDocument, openCustomDocument (No changes)
     async saveCustomDocumentAs(document: ReqDocument, destination: vscode.Uri, cancellation: vscode.CancellationToken): Promise<void> {
@@ -75,7 +186,14 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                         }
                     }
                 }
-                finalHeaders = { ...headers, ...form.getHeaders() };
+                // Remove any user-set Content-Type so the generated boundary wins
+                const cleanedHeaders: Record<string, string> = {};
+                for (const [k, v] of Object.entries(headers ?? {})) {
+                    if (k.toLowerCase() !== 'content-type') {
+                        cleanedHeaders[k] = v as string;
+                    }
+                }
+                finalHeaders = { ...cleanedHeaders, ...form.getHeaders() };
                 processedBody = await form.getBuffer();
             }
         }
@@ -103,39 +221,99 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
 
         webviewPanel.webview.postMessage({ command: 'load-request', data: document.documentData });
 
+        const envList = await this._scanEnvFiles(document.uri);
+        const defaultEnv = envList.find(e => e.name === 'default');
+        const defaultFile = defaultEnv?.file || '';
+        if (defaultFile) {
+            this._panelEnvs.set(webviewPanel, defaultFile);
+        }
+        webviewPanel.webview.postMessage({ command: 'load-environments', environments: envList, defaultFile });
+
+        webviewPanel.onDidDispose(() => {
+            this._cancelPendingRequest(webviewPanel);
+            this._requestGenerations.delete(webviewPanel);
+            this._panelEnvs.delete(webviewPanel);
+        });
+
         webviewPanel.webview.onDidReceiveMessage(async (message) => {
             console.log('[REQ-STUDIO] Received message:', message);
             if (message.command === 'send-request') {
                 const { method, url } = message;
+
+                const generation = this._nextGeneration(webviewPanel);
+                this._cancelPendingRequest(webviewPanel);
+
+                await this._applyEnvToMessage(message);
+
+                const controller = new AbortController();
+                this._activeControllers.set(webviewPanel, controller);
+
+                const timeoutMs = vscode.workspace.getConfiguration('reqstudio').get<number>('requestTimeout', 30000);
+                let timedOut = false;
+                const timeoutId = setTimeout(() => {
+                    timedOut = true;
+                    controller.abort();
+                }, timeoutMs);
+
                 try {
                     const { body: processedBody, headers: finalHeaders } = await this.prepareBodyAndHeaders(message);
-                    
-                    const res = await fetch(url, {
+
+                    const res = await fetch(message.url, {
                         method,
                         headers: finalHeaders,
-                        body: method === 'GET' ? undefined : processedBody
+                        body: method === 'GET' ? undefined : processedBody,
+                        signal: controller.signal
                     }) as Response;
-                    
+
+                    if (this._isStale(webviewPanel, generation)) { return; }
+
                     webviewPanel.webview.postMessage({ command: 'response-start', status: res.status, statusText: res.statusText, headers: Object.fromEntries(res.headers.entries()) });
 
                     if (res.body) {
                         for await (const chunk of res.body) {
+                            if (this._isStale(webviewPanel, generation)) { return; }
                             webviewPanel.webview.postMessage({ command: 'response-chunk', chunk: (chunk as Buffer).toString('base64') });
                         }
                     }
-                    
+
+                    if (this._isStale(webviewPanel, generation)) { return; }
                     webviewPanel.webview.postMessage({ command: 'response-end' });
 
                 } catch (err: any) {
+                    if (this._isStale(webviewPanel, generation)) { return; }
+
                     console.error('[REQ-STUDIO] Fetch Error:', err);
-                    // ** THE FIX IS HERE **
-                    webviewPanel.webview.postMessage({ command: 'response', response: 'Error: ' + err.message, status: 0, statusText: 'Error' });
+                    if (err.name === 'AbortError') {
+                        if (timedOut) {
+                            webviewPanel.webview.postMessage({ command: 'response-error', message: `Request timed out after ${timeoutMs / 1000} seconds.` });
+                        } else {
+                            webviewPanel.webview.postMessage({ command: 'response-cancelled' });
+                        }
+                    } else {
+                        webviewPanel.webview.postMessage({ command: 'response-error', message: 'Error: ' + err.message });
+                    }
+                } finally {
+                    clearTimeout(timeoutId);
+                    if (!this._isStale(webviewPanel, generation)) {
+                        this._activeControllers.delete(webviewPanel);
+                    }
+                }
+            } else if (message.command === 'cancel-request') {
+                this._cancelPendingRequest(webviewPanel);
+            } else if (message.command === 'env-changed') {
+                if (message.file) {
+                    this._panelEnvs.set(webviewPanel, message.file);
+                } else {
+                    this._panelEnvs.delete(webviewPanel);
                 }
             } else if (message.command === 'save-request') {
                 document.update(message.data);
                 this._onDidChangeCustomDocument.fire({ document, undo: () => {}, redo: () => {} });
                 vscode.commands.executeCommand('workbench.action.files.save');
                 webviewPanel.webview.postMessage({ command: 'save-status', ok: true });
+            } else if (message.command === 'document-changed') {
+                document.update(message.data);
+                this._onDidChangeCustomDocument.fire({ document, undo: () => {}, redo: () => {} });
             }
         });
     }

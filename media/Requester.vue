@@ -1,7 +1,10 @@
 <template>
     <div class="h-screen w-full p-2 flex flex-col">
-        <div class="flex justify-end mb-2">
-            <vscode-button @click="saveRequest">Save</vscode-button>
+        <div class="flex justify-end mb-2 gap-2 items-center">
+            <vscode-single-select v-model="selectedEnvFile" class="w-40">
+                <vscode-option value="">-- No Env --</vscode-option>
+                <vscode-option v-for="env in environments" :key="env.file" :value="env.file">{{ env.name }}</vscode-option>
+            </vscode-single-select>
         </div>
         <vscode-split-layout class="h-full grow">
             <div slot="start" class="flex flex-col gap-2">
@@ -14,7 +17,8 @@
                         <vscode-option value="DELETE">DELETE</vscode-option>
                     </vscode-single-select>
                     <vscode-textfield v-model="url" placeholder="http://localhost:3000" class="grow"></vscode-textfield>
-                    <vscode-button @click="sendRequest">Send</vscode-button>
+                    <vscode-button v-if="!isSending" @click="sendRequest">Send</vscode-button>
+                    <vscode-button v-else @click="cancelRequest" appearance="secondary">Cancel</vscode-button>
                 </div>
 
                 <div class="flex flex-row h-full">
@@ -123,7 +127,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import '@vscode-elements/elements';
 
 // =========================================================================
@@ -134,32 +138,51 @@ const url = ref('');
 const params = ref([{ key: '', value: '', enabled: true }]);
 const headers = ref([{ key: '', value: '', enabled: true }]);
 
-// New state for different body types
-const bodyType = ref('none');
-const bodyText = ref('');
-const bodyUrlEncoded = ref([{ key: '', value: '', enabled: true }]);
-const bodyMultipart = ref([{ key: '', value: '', type: 'text', enabled: true }]);
-const bodyBinaryFile = ref(null); // Will hold { name, size, base64content }
+    // New state for different body types
+    const bodyType = ref('none');
+    const bodyText = ref('');
+    const bodyUrlEncoded = ref([{ key: '', value: '', enabled: true }]);
+    const bodyMultipart = ref([{ key: '', value: '', type: 'text', enabled: true }]);
+    const bodyBinaryFile = ref(null); // Will hold { name, size, base64content }
 
-const responseBody = ref('');
-const responseHeaders = ref(null);
-const statusCode = ref(null);
-const responseTime = ref(null);
+    const responseBody = ref('');
+    const responseHeaders = ref(null);
+    const statusCode = ref(null);
+    const responseTime = ref(null);
+    const isSending = ref(false);
 
-let vscode;
-let requestStartTime = null;
-let chunkBuffers = [];
+    const environments = ref([]);
+    const selectedEnvFile = ref('');
 
-const statusCodeClass = computed(() => {
-    if (statusCode.value == null) return '';
-    if (statusCode.value >= 200 && statusCode.value < 300) return 'text-green-600';
-    if (statusCode.value >= 400) return 'text-red-600';
-    return 'text-yellow-600';
-});
+    let vscode;
+    let requestStartTime = null;
+    let chunkBuffers = [];
+    let isLoading = true;
 
-// =========================================================================
-//  LIFECYCLE HOOKS
-// =========================================================================
+    const statusCodeClass = computed(() => {
+        if (statusCode.value == null) return '';
+        if (statusCode.value >= 200 && statusCode.value < 300) return 'text-green-600';
+        if (statusCode.value >= 400) return 'text-red-600';
+        return 'text-yellow-600';
+    });
+
+    const requestData = computed(getRequestData);
+
+    watch(requestData, (newData) => {
+        if (!isLoading && vscode) {
+            vscode.postMessage({ command: 'document-changed', data: newData });
+        }
+    }, { flush: 'sync' });
+
+    watch(selectedEnvFile, (file) => {
+        if (vscode) {
+            vscode.postMessage({ command: 'env-changed', file });
+        }
+    });
+
+    // =========================================================================
+    //  LIFECYCLE HOOKS
+    // =========================================================================
 onMounted(() => {
     if (window.acquireVsCodeApi) {
         vscode = window.acquireVsCodeApi();
@@ -170,6 +193,12 @@ onMounted(() => {
         switch (message.command) {
             case 'load-request': setRequestData(message.data); break;
             case 'save-status': console.log(message.ok ? 'Request saved!' : 'Save failed.'); break;
+            case 'load-environments':
+                environments.value = message.environments;
+                if (message.defaultFile) {
+                    selectedEnvFile.value = message.defaultFile;
+                }
+                break;
             case 'response-start':
                 chunkBuffers = [];
                 statusCode.value = message.status;
@@ -186,12 +215,28 @@ onMounted(() => {
                 for (const arr of chunkBuffers) { all.set(arr, offset); offset += arr.length; }
                 responseBody.value = tryDecodeToString(all);
                 if (requestStartTime) { responseTime.value = Math.round(performance.now() - requestStartTime); }
+                isSending.value = false;
                 break;
             case 'response':
                 statusCode.value = message.status;
                 responseBody.value = message.response;
                 responseHeaders.value = message.headers || null;
                 if (requestStartTime) { responseTime.value = Math.round(performance.now() - requestStartTime); }
+                isSending.value = false;
+                break;
+            case 'response-cancelled':
+                responseBody.value = 'Request cancelled.';
+                responseHeaders.value = null;
+                statusCode.value = null;
+                responseTime.value = null;
+                isSending.value = false;
+                break;
+            case 'response-error':
+                responseBody.value = message.message;
+                responseHeaders.value = null;
+                statusCode.value = null;
+                responseTime.value = null;
+                isSending.value = false;
                 break;
         }
     });
@@ -269,22 +314,33 @@ function getRequestData() {
     };
 }
 
-function setRequestData(data) {
-    if (!data) return;
-    const fromPlain = (arr) => Array.isArray(arr) && arr.length > 0 ? arr : [{ key: '', value: '', enabled: true }];
-    method.value = data.method || 'GET';
-    url.value = data.url || '';
-    params.value = fromPlain(data.params);
-    headers.value = fromPlain(data.headers);
-    bodyType.value = data.bodyType || 'none';
-    bodyText.value = data.bodyText || '';
-    bodyUrlEncoded.value = fromPlain(data.bodyUrlEncoded);
-    bodyMultipart.value = Array.isArray(data.bodyMultipart) && data.bodyMultipart.length > 0 ? data.bodyMultipart : [{ key: '', value: '', type: 'text', enabled: true }];
-}
+    function setRequestData(data) {
+        if (!data) {
+            isLoading = false;
+            return;
+        }
+        isLoading = true;
+        const fromPlain = (arr) => Array.isArray(arr) && arr.length > 0 ? arr : [{ key: '', value: '', enabled: true }];
+        method.value = data.method || 'GET';
+        url.value = data.url || '';
+        params.value = fromPlain(data.params);
+        headers.value = fromPlain(data.headers);
+        bodyType.value = data.bodyType || 'none';
+        bodyText.value = data.bodyText || '';
+        bodyUrlEncoded.value = fromPlain(data.bodyUrlEncoded);
+        bodyMultipart.value = Array.isArray(data.bodyMultipart) && data.bodyMultipart.length > 0 ? data.bodyMultipart : [{ key: '', value: '', type: 'text', enabled: true }];
+        isLoading = false;
+    }
 
 function saveRequest() {
     if (vscode) {
         vscode.postMessage({ command: 'save-request', data: getRequestData() });
+    }
+}
+
+function cancelRequest() {
+    if (vscode) {
+        vscode.postMessage({ command: 'cancel-request' });
     }
 }
 
@@ -295,13 +351,12 @@ async function sendRequest() {
         return;
     }
 
-    // 1. Build URL with params (no changes here)
-    let reqUrl = url.value;
-    const activeParams = params.value.filter(p => p.enabled && p.key);
-    if (activeParams.length > 0) {
-        const searchParams = new URLSearchParams(activeParams.map(p => [p.key, p.value])).toString();
-        reqUrl += (reqUrl.includes('?') ? '&' : '?') + searchParams;
-    }
+    isSending.value = true;
+
+    // 1. Collect active params (leave URL raw so backend can substitute env vars)
+    const activeParams = params.value
+        .filter(p => p.enabled && p.key)
+        .map(p => ({ key: p.key, value: p.value, enabled: p.enabled }));
 
     // 2. Build Headers (no changes here)
     const reqHeaders = {};
@@ -351,9 +406,11 @@ async function sendRequest() {
     vscode.postMessage({
         command: 'send-request',
         method: method.value,
-        url: reqUrl,
+        url: url.value,
+        params: activeParams,
         headers: reqHeaders,
-        body: (method.value === 'GET' || !reqBodyPayload) ? undefined : reqBodyPayload
+        body: (method.value === 'GET' || !reqBodyPayload) ? undefined : reqBodyPayload,
+        envFile: selectedEnvFile.value
     });
 }
 

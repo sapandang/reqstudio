@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "{{URL}}/api/test",
+  "params": [
+    {
+      "key": "param",
+      "value": "{{DATA1}}",
+      "enabled": true
+    }
+  ],
+  "headers": [],
+  "bodyType": "none",
+  "bodyText": "dfsd",
+  "bodyUrlEncoded": [],
+  "bodyMultipart": [
+    {
+      "key": "",
+      "value": "",
+      "type": "text",
+      "enabled": true
+    }
+  ]
+}
