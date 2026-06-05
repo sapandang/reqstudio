@@ -1,6 +1,10 @@
 <template>
     <div class="h-screen w-full p-2 flex flex-col">
-        <div class="flex justify-end mb-2">
+        <div class="flex justify-end mb-2 gap-2 items-center">
+            <vscode-single-select v-model="selectedEnvFile" class="w-40">
+                <vscode-option value="">-- No Env --</vscode-option>
+                <vscode-option v-for="env in environments" :key="env.file" :value="env.file">{{ env.name }}</vscode-option>
+            </vscode-single-select>
             <vscode-button @click="saveRequest">Save</vscode-button>
         </div>
         <vscode-split-layout class="h-full grow">
@@ -135,18 +139,21 @@ const url = ref('');
 const params = ref([{ key: '', value: '', enabled: true }]);
 const headers = ref([{ key: '', value: '', enabled: true }]);
 
-// New state for different body types
-const bodyType = ref('none');
-const bodyText = ref('');
-const bodyUrlEncoded = ref([{ key: '', value: '', enabled: true }]);
-const bodyMultipart = ref([{ key: '', value: '', type: 'text', enabled: true }]);
-const bodyBinaryFile = ref(null); // Will hold { name, size, base64content }
+    // New state for different body types
+    const bodyType = ref('none');
+    const bodyText = ref('');
+    const bodyUrlEncoded = ref([{ key: '', value: '', enabled: true }]);
+    const bodyMultipart = ref([{ key: '', value: '', type: 'text', enabled: true }]);
+    const bodyBinaryFile = ref(null); // Will hold { name, size, base64content }
 
     const responseBody = ref('');
     const responseHeaders = ref(null);
     const statusCode = ref(null);
     const responseTime = ref(null);
     const isSending = ref(false);
+
+    const environments = ref([]);
+    const selectedEnvFile = ref('');
 
     let vscode;
     let requestStartTime = null;
@@ -168,6 +175,12 @@ const bodyBinaryFile = ref(null); // Will hold { name, size, base64content }
         }
     }, { flush: 'sync' });
 
+    watch(selectedEnvFile, (file) => {
+        if (vscode) {
+            vscode.postMessage({ command: 'env-changed', file });
+        }
+    });
+
     // =========================================================================
     //  LIFECYCLE HOOKS
     // =========================================================================
@@ -181,6 +194,12 @@ onMounted(() => {
         switch (message.command) {
             case 'load-request': setRequestData(message.data); break;
             case 'save-status': console.log(message.ok ? 'Request saved!' : 'Save failed.'); break;
+            case 'load-environments':
+                environments.value = message.environments;
+                if (message.defaultFile) {
+                    selectedEnvFile.value = message.defaultFile;
+                }
+                break;
             case 'response-start':
                 chunkBuffers = [];
                 statusCode.value = message.status;
@@ -335,13 +354,10 @@ async function sendRequest() {
 
     isSending.value = true;
 
-    // 1. Build URL with params (no changes here)
-    let reqUrl = url.value;
-    const activeParams = params.value.filter(p => p.enabled && p.key);
-    if (activeParams.length > 0) {
-        const searchParams = new URLSearchParams(activeParams.map(p => [p.key, p.value])).toString();
-        reqUrl += (reqUrl.includes('?') ? '&' : '?') + searchParams;
-    }
+    // 1. Collect active params (leave URL raw so backend can substitute env vars)
+    const activeParams = params.value
+        .filter(p => p.enabled && p.key)
+        .map(p => ({ key: p.key, value: p.value, enabled: p.enabled }));
 
     // 2. Build Headers (no changes here)
     const reqHeaders = {};
@@ -391,9 +407,11 @@ async function sendRequest() {
     vscode.postMessage({
         command: 'send-request',
         method: method.value,
-        url: reqUrl,
+        url: url.value,
+        params: activeParams,
         headers: reqHeaders,
-        body: (method.value === 'GET' || !reqBodyPayload) ? undefined : reqBodyPayload
+        body: (method.value === 'GET' || !reqBodyPayload) ? undefined : reqBodyPayload,
+        envFile: selectedEnvFile.value
     });
 }
 
