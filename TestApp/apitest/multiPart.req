@@ -1,6 +1,6 @@
 {
   "method": "POST",
-  "url": "{{URL}}/api/upload/mixed",
+  "url": "{{URL}}/api/upload/multiple",
   "params": [],
   "headers": [],
   "bodyType": "multipart/form-data",
@@ -14,19 +14,19 @@
   ],
   "bodyMultipart": [
     {
-      "key": "sdas",
-      "value": "sdasd",
+      "key": "dummy",
+      "value": "hello",
       "type": "text",
       "enabled": true
     },
     {
-      "key": "file",
+      "key": "files",
       "value": null,
       "type": "file",
       "enabled": true
     },
     {
-      "key": "fee",
+      "key": "file2",
       "value": null,
       "type": "file",
       "enabled": true

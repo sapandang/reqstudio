@@ -52,10 +52,11 @@ app.post('/api/upload/single', upload.single('file'), (req, res) => {
 });
 
 // POST multipart/form-data (multiple files)
-app.post('/api/upload/multiple', upload.array('files', 10), (req, res) => {
+app.post('/api/upload/multiple', upload.any(), (req, res) => {
     console.log('Body fields:', req.body);
-    if (req.files && req.files.length > 0) {
-        req.files.forEach(f => console.log('Uploaded file:', f.originalname, 'size:', f.size));
+    const files = req.files || [];
+    if (files.length > 0) {
+        files.forEach(f => console.log('Uploaded file:', f.originalname, 'fieldname:', f.fieldname, 'size:', f.size));
     } else {
         console.log('No files received');
     }

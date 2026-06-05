@@ -1,9 +1,15 @@
 {
-  "method": "POST",
+  "method": "GET",
   "url": "{{URL}}/api/test",
-  "params": [],
+  "params": [
+    {
+      "key": "param",
+      "value": "{{DATA1}}",
+      "enabled": true
+    }
+  ],
   "headers": [],
-  "bodyType": "application/octet-stream",
+  "bodyType": "none",
   "bodyText": "dfsd",
   "bodyUrlEncoded": [],
   "bodyMultipart": [

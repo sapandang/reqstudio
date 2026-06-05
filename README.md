@@ -1,8 +1,10 @@
 # reqstudio 🚀
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![VS Code Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/sapandang.reqstudio.svg)](https://marketplace.visualstudio.com/items?itemName=sapandang.reqstudio)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/your-username/reqstudio/main.yml?branch=main)](https://github.com/sapandang/reqstudio/actions)
+[![Install in VS Code](https://img.shields.io/badge/VS%20Code-Install%20Extension-007ACC?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=sapandang.reqstudio)
+
+
+![reqstudio Screenshot](./reqstudio.png)
 
 **reqstudio** is a powerful, open-source HTTP and REST API client that lives directly inside Visual Studio Code. It provides a rich, graphical interface for creating, sending, and testing API requests, all managed through simple, text-based `.req` files.
 
@@ -10,8 +12,7 @@ Stop switching windows to test your APIs. Keep your API requests version-control
 
 ***
 
-### ✨ **A picture is worth a thousand words!** ✨
-![reqstudio Screenshot](./screenshot.png)
+
 
 ---
 
@@ -26,6 +27,7 @@ Stop switching windows to test your APIs. Keep your API requests version-control
 * **✅ Toggable Parameters**: Temporarily enable or disable params and headers with a single click without deleting them.
 * **🌊 Streaming Responses**: Handles large API responses gracefully by streaming the data, keeping the UI responsive.
 * **📊 Rich Response Viewer**: View response status, time, headers, and the formatted response body.
+* **🔧 Environment Variables**: Supports environment variables that can be substituted into URLs, headers, and request bodies.
 * **💾 Version Control Friendly**: Since requests are saved as simple JSON in `.req` files, you can commit them to Git and track changes over time.
 
 ---
@@ -92,6 +94,45 @@ Your requests are saved in a clean, human-readable JSON format. This allows you 
   ]
 }
 ```
+
+### Using Environment Variables
+
+You can manage environment variables to reuse values across multiple requests. This is useful for switching between development, staging, and production configurations without modifying each `.req` file.
+
+**Creating an environment file**
+
+Create a `.reqenv` file in your workspace root for global environments, or create a file named `<filename>.reqenv` next to a specific `.req` file for per-request environments.
+
+Example `.reqenv` file:
+
+```groovy
+URL=http://localhost:3456
+DATA1=456
+```
+
+**Substituting variables**
+![alt text](images/envvars.png)
+
+Inside your `.req` file, reference variables with double curly braces:
+
+```json
+{
+  "method": "GET",
+  "url": "{{baseUrl}}/users/{{userId}}",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{apiKey}}"
+    }
+  ]
+}
+```
+
+Variable substitution works in the URL, headers, and request body text fields.
+
+**Selecting an environment in the UI**
+
+When a `.req` file is open, use the environment selector dropdown in the request UI to pick the active environment. The active environment variables are applied automatically before the request is sent.
 
 ## 🤝 Contributing
 
