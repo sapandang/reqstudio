@@ -111,6 +111,7 @@ DATA1=456
 ```
 
 **Substituting variables**
+
 ![alt text](images/envvars.png)
 
 Inside your `.req` file, reference variables with double curly braces:
