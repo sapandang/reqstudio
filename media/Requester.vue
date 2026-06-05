@@ -123,7 +123,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import '@vscode-elements/elements';
 
 // =========================================================================
@@ -146,20 +146,29 @@ const responseHeaders = ref(null);
 const statusCode = ref(null);
 const responseTime = ref(null);
 
-let vscode;
-let requestStartTime = null;
-let chunkBuffers = [];
+    let vscode;
+    let requestStartTime = null;
+    let chunkBuffers = [];
+    let isLoading = true;
 
-const statusCodeClass = computed(() => {
-    if (statusCode.value == null) return '';
-    if (statusCode.value >= 200 && statusCode.value < 300) return 'text-green-600';
-    if (statusCode.value >= 400) return 'text-red-600';
-    return 'text-yellow-600';
-});
+    const statusCodeClass = computed(() => {
+        if (statusCode.value == null) return '';
+        if (statusCode.value >= 200 && statusCode.value < 300) return 'text-green-600';
+        if (statusCode.value >= 400) return 'text-red-600';
+        return 'text-yellow-600';
+    });
 
-// =========================================================================
-//  LIFECYCLE HOOKS
-// =========================================================================
+    const requestData = computed(getRequestData);
+
+    watch(requestData, (newData) => {
+        if (!isLoading && vscode) {
+            vscode.postMessage({ command: 'document-changed', data: newData });
+        }
+    }, { flush: 'sync' });
+
+    // =========================================================================
+    //  LIFECYCLE HOOKS
+    // =========================================================================
 onMounted(() => {
     if (window.acquireVsCodeApi) {
         vscode = window.acquireVsCodeApi();
@@ -269,18 +278,23 @@ function getRequestData() {
     };
 }
 
-function setRequestData(data) {
-    if (!data) return;
-    const fromPlain = (arr) => Array.isArray(arr) && arr.length > 0 ? arr : [{ key: '', value: '', enabled: true }];
-    method.value = data.method || 'GET';
-    url.value = data.url || '';
-    params.value = fromPlain(data.params);
-    headers.value = fromPlain(data.headers);
-    bodyType.value = data.bodyType || 'none';
-    bodyText.value = data.bodyText || '';
-    bodyUrlEncoded.value = fromPlain(data.bodyUrlEncoded);
-    bodyMultipart.value = Array.isArray(data.bodyMultipart) && data.bodyMultipart.length > 0 ? data.bodyMultipart : [{ key: '', value: '', type: 'text', enabled: true }];
-}
+    function setRequestData(data) {
+        if (!data) {
+            isLoading = false;
+            return;
+        }
+        isLoading = true;
+        const fromPlain = (arr) => Array.isArray(arr) && arr.length > 0 ? arr : [{ key: '', value: '', enabled: true }];
+        method.value = data.method || 'GET';
+        url.value = data.url || '';
+        params.value = fromPlain(data.params);
+        headers.value = fromPlain(data.headers);
+        bodyType.value = data.bodyType || 'none';
+        bodyText.value = data.bodyText || '';
+        bodyUrlEncoded.value = fromPlain(data.bodyUrlEncoded);
+        bodyMultipart.value = Array.isArray(data.bodyMultipart) && data.bodyMultipart.length > 0 ? data.bodyMultipart : [{ key: '', value: '', type: 'text', enabled: true }];
+        isLoading = false;
+    }
 
 function saveRequest() {
     if (vscode) {

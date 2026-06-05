@@ -136,6 +136,9 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                 this._onDidChangeCustomDocument.fire({ document, undo: () => {}, redo: () => {} });
                 vscode.commands.executeCommand('workbench.action.files.save');
                 webviewPanel.webview.postMessage({ command: 'save-status', ok: true });
+            } else if (message.command === 'document-changed') {
+                document.update(message.data);
+                this._onDidChangeCustomDocument.fire({ document, undo: () => {}, redo: () => {} });
             }
         });
     }
