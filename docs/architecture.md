@@ -228,9 +228,13 @@ This is a single large Vue component that holds all UI state. Key sections:
 Template
   - Description field
   - Environment selector
-  - Method + URL + Send/Cancel
+  - Method + URL + Send/Cancel + Export
   - Tabs: Parameters | Body | Headers
   - Response pane: Status, Time, Body, Headers
+  - Export Code Modal (Language selector: cURL, JS fetch, Axios, Python, Go, Java; preview & copy button)
+
+Helper Modules
+  - `codeGen.js` — Code snippet generator converting request data (URL, method, headers, query params, body) into multi-language snippets.
 
 Script
   - Refs for all request fields

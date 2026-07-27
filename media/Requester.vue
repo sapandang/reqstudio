@@ -24,6 +24,11 @@
                     <vscode-textfield v-model="url" placeholder="http://localhost:3000" class="grow"></vscode-textfield>
                     <vscode-button v-if="!isSending" @click="sendRequest">Send</vscode-button>
                     <vscode-button v-else @click="cancelRequest" appearance="secondary">Cancel</vscode-button>
+                    <vscode-button appearance="icon" @click="showExportModal = true" title="Export Code Snippet">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                        </svg>
+                    </vscode-button>
                 </div>
 
                 <div class="flex flex-row h-full">
@@ -128,12 +133,52 @@
                 </vscode-tabs>
             </div>
         </vscode-split-layout>
+
+        <!-- Export Code Modal -->
+        <div v-if="showExportModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] rounded-lg shadow-xl w-full max-w-2xl flex flex-col p-4 gap-3 max-h-[85vh]">
+                <div class="flex justify-between items-center border-b border-[var(--vscode-panel-border)] pb-2">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                        </svg>
+                        Export Code Snippet
+                    </h3>
+                    <vscode-button appearance="icon" aria-label="Close" title="Close" @click="showExportModal = false">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </vscode-button>
+                </div>
+                
+                <div class="flex gap-2 items-center">
+                    <label class="text-sm font-medium">Language:</label>
+                    <vscode-single-select v-model="selectedLanguage" class="w-56">
+                        <vscode-option value="curl">cURL</vscode-option>
+                        <vscode-option value="js-fetch">JavaScript (fetch)</vscode-option>
+                        <vscode-option value="js-axios">JavaScript (axios)</vscode-option>
+                        <vscode-option value="python-requests">Python (requests)</vscode-option>
+                        <vscode-option value="go">Go (net/http)</vscode-option>
+                        <vscode-option value="java">Java (HttpClient)</vscode-option>
+                    </vscode-single-select>
+                    <div class="grow"></div>
+                    <vscode-button @click="copyCodeSnippet">
+                        {{ copyStatusText }}
+                    </vscode-button>
+                </div>
+                
+                <div class="grow overflow-auto border border-[var(--vscode-panel-border)] rounded p-3 bg-[var(--vscode-textCodeBlock-background,#1e1e1e)]">
+                    <pre class="font-mono text-xs whitespace-pre-wrap break-all select-all">{{ generatedCode }}</pre>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import '@vscode-elements/elements';
+import { generateCode } from './codeGen.js';
 
 // =========================================================================
 //  STATE, REFS, AND VARIABLES
@@ -143,6 +188,24 @@ import '@vscode-elements/elements';
     const description = ref('');
 const params = ref([{ key: '', value: '', enabled: true }]);
 const headers = ref([{ key: '', value: '', enabled: true }]);
+
+    // Export code modal state
+    const showExportModal = ref(false);
+    const selectedLanguage = ref('curl');
+    const copyStatusText = ref('Copy Code');
+    const currentEnvData = ref({});
+
+    const generatedCode = computed(() => {
+        return generateCode(requestData.value, selectedLanguage.value, currentEnvData.value);
+    });
+
+    function copyCodeSnippet() {
+        if (generatedCode.value) {
+            navigator.clipboard.writeText(generatedCode.value);
+            copyStatusText.value = 'Copied!';
+            setTimeout(() => { copyStatusText.value = 'Copy Code'; }, 2000);
+        }
+    }
 
     // New state for different body types
     const bodyType = ref('none');
@@ -204,6 +267,10 @@ onMounted(() => {
                 if (message.defaultFile) {
                     selectedEnvFile.value = message.defaultFile;
                 }
+                currentEnvData.value = message.envData || {};
+                break;
+            case 'env-data':
+                currentEnvData.value = message.envData || {};
                 break;
             case 'response-start':
                 chunkBuffers = [];

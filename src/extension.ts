@@ -109,6 +109,16 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
         return env;
     }
 
+    private async _readEnvFile(filePath: string): Promise<Record<string, string>> {
+        if (!filePath) { return {}; }
+        try {
+            const content = await fs.promises.readFile(filePath, 'utf8');
+            return this._parseEnvContent(content);
+        } catch {
+            return {};
+        }
+    }
+
     private async _applyEnvToMessage(message: any): Promise<void> {
         const envFile = message.envFile as string | undefined;
         if (!envFile) { return; }
@@ -235,10 +245,12 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
         const envList = await this._scanEnvFiles(document.uri);
         const defaultEnv = envList.find(e => e.name === 'default');
         const defaultFile = defaultEnv?.file || '';
+        let envData: Record<string, string> = {};
         if (defaultFile) {
             this._panelEnvs.set(webviewPanel, defaultFile);
+            envData = await this._readEnvFile(defaultFile);
         }
-        webviewPanel.webview.postMessage({ command: 'load-environments', environments: envList, defaultFile });
+        webviewPanel.webview.postMessage({ command: 'load-environments', environments: envList, defaultFile, envData });
 
         webviewPanel.onDidDispose(() => {
             this._cancelPendingRequest(webviewPanel);
@@ -314,8 +326,11 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
             } else if (message.command === 'env-changed') {
                 if (message.file) {
                     this._panelEnvs.set(webviewPanel, message.file);
+                    const envData = await this._readEnvFile(message.file);
+                    webviewPanel.webview.postMessage({ command: 'env-data', file: message.file, envData });
                 } else {
                     this._panelEnvs.delete(webviewPanel);
+                    webviewPanel.webview.postMessage({ command: 'env-data', file: '', envData: {} });
                 }
             } else if (message.command === 'save-request') {
                 document.update(message.data);
