@@ -142,7 +142,7 @@ A `.req` file is a **JSON document** that describes an HTTP/REST API request for
 
 ## 6. Environment Files (`.reqenv`)
 
-If you generate `.req` files with `{{VAR}}` placeholders, mention that a `.reqenv` file must be created in the **same directory**.
+If you generate `.req` files with `{{VAR}}` placeholders, mention that a `.reqenv` file can be placed in the **workspace root directory** or the **same directory** as the `.req` file (relative `.reqenv` files override root ones of the same environment name).
 
 ### Supported formats
 

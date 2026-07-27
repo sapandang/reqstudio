@@ -85,7 +85,7 @@ VS Code extensions run in a **Node.js Extension Host** process. The editor UI ru
 4. `resolveCustomEditor()`:
    - Reads `media/dist/index.html`, injects webview URIs for assets.
    - Sends `load-request` message to the webview containing `document.documentData`.
-   - Scans the same directory for `.reqenv` files and sends `load-environments`.
+   - Scans the workspace root directory and relative directory for `.reqenv` files and sends `load-environments` (relative `.reqenv` files override root ones of the same name).
 5. The Vue app receives `load-request` and calls `setRequestData()` to populate the UI.
 
 ### 4.2 Editing a Request
@@ -185,7 +185,7 @@ Environment files live next to `.req` files. Two formats are supported:
 1. **JSON** — parsed directly.
 2. **Dotenv** — `KEY=value` lines, `#` comments ignored.
 
-The extension auto-discovers files ending in `.reqenv` in the same directory as the `.req` file. A file named `.reqenv` is treated as the **default** environment.
+The extension auto-discovers files ending in `.reqenv` from both the workspace root directory and the same directory as the `.req` file. If an environment file with the same name exists in both directories, the relative file overrides the root-level file. A file named `.reqenv` is treated as the **default** environment.
 
 Example `.reqenv`:
 ```
@@ -228,9 +228,15 @@ This is a single large Vue component that holds all UI state. Key sections:
 Template
   - Description field
   - Environment selector
-  - Method + URL + Send/Cancel
+  - Method + URL + Send/Cancel + Import + Export
   - Tabs: Parameters | Body | Headers
   - Response pane: Status, Time, Body, Headers
+  - Import cURL Modal (Textarea input, parser, and error feedback)
+  - Export Code Modal (Language selector: cURL, JS fetch, Axios, Python, Go, Java; preview & copy button)
+
+Helper Modules
+  - `codeGen.js` — Code snippet generator converting request data (URL, method, headers, query params, body) into multi-language snippets.
+  - `curlParser.js` — Shell command tokenizer and cURL parser extracting method, URL, query params, headers, and body payloads.
 
 Script
   - Refs for all request fields

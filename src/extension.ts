@@ -56,20 +56,31 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
     }
 
     private async _scanEnvFiles(reqUri: vscode.Uri): Promise<{ name: string; file: string }[]> {
-        const results: { name: string; file: string }[] = [];
-        const dir = path.dirname(reqUri.fsPath);
-        try {
-            const files = await fs.promises.readdir(dir);
-            for (const file of files) {
-                if (file.endsWith('.reqenv')) {
-                    const name = file === '.reqenv' ? 'default' : file.replace(/\.reqenv$/, '');
-                    results.push({ name, file: path.join(dir, file) });
+        const envMap = new Map<string, { name: string; file: string }>();
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(reqUri);
+        const rootDir = workspaceFolder ? workspaceFolder.uri.fsPath : undefined;
+        const reqDir = path.dirname(reqUri.fsPath);
+
+        const scanDir = async (dirPath: string) => {
+            try {
+                const files = await fs.promises.readdir(dirPath);
+                for (const file of files) {
+                    if (file.endsWith('.reqenv')) {
+                        const name = file === '.reqenv' ? 'default' : file.replace(/\.reqenv$/, '');
+                        envMap.set(name, { name, file: path.join(dirPath, file) });
+                    }
                 }
+            } catch {
+                /* ignore read errors */
             }
-        } catch {
-            /* ignore read errors */
+        };
+
+        if (rootDir && rootDir !== reqDir) {
+            await scanDir(rootDir);
         }
-        return results;
+        await scanDir(reqDir);
+
+        return Array.from(envMap.values());
     }
 
     private _substituteEnvVars(text: string, env: Record<string, string>): string {
@@ -96,6 +107,16 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
             if (key) { env[key] = value; }
         }
         return env;
+    }
+
+    private async _readEnvFile(filePath: string): Promise<Record<string, string>> {
+        if (!filePath) { return {}; }
+        try {
+            const content = await fs.promises.readFile(filePath, 'utf8');
+            return this._parseEnvContent(content);
+        } catch {
+            return {};
+        }
     }
 
     private async _applyEnvToMessage(message: any): Promise<void> {
@@ -224,10 +245,12 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
         const envList = await this._scanEnvFiles(document.uri);
         const defaultEnv = envList.find(e => e.name === 'default');
         const defaultFile = defaultEnv?.file || '';
+        let envData: Record<string, string> = {};
         if (defaultFile) {
             this._panelEnvs.set(webviewPanel, defaultFile);
+            envData = await this._readEnvFile(defaultFile);
         }
-        webviewPanel.webview.postMessage({ command: 'load-environments', environments: envList, defaultFile });
+        webviewPanel.webview.postMessage({ command: 'load-environments', environments: envList, defaultFile, envData });
 
         webviewPanel.onDidDispose(() => {
             this._cancelPendingRequest(webviewPanel);
@@ -261,7 +284,7 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                     const res = await fetch(message.url, {
                         method,
                         headers: finalHeaders,
-                        body: method === 'GET' ? undefined : processedBody,
+                        body: (method === 'GET' || method === 'HEAD') ? undefined : processedBody,
                         signal: controller.signal
                     }) as Response;
 
@@ -303,8 +326,11 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
             } else if (message.command === 'env-changed') {
                 if (message.file) {
                     this._panelEnvs.set(webviewPanel, message.file);
+                    const envData = await this._readEnvFile(message.file);
+                    webviewPanel.webview.postMessage({ command: 'env-data', file: message.file, envData });
                 } else {
                     this._panelEnvs.delete(webviewPanel);
+                    webviewPanel.webview.postMessage({ command: 'env-data', file: '', envData: {} });
                 }
             } else if (message.command === 'save-request') {
                 document.update(message.data);

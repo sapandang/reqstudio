@@ -1,14 +1,61 @@
 <template>
-    <div class="h-screen w-full p-2 flex flex-col">
-        <div class="flex  mb-2 gap-2 items-center">
-                <div class="w-full grow">
+    <div class="h-screen w-full p-2 flex flex-col gap-1 text-[var(--vscode-foreground)] bg-[var(--vscode-editor-background)]">
+        <!-- Top Toolbar -->
+        <div class="flex items-center justify-between px-2 py-1 bg-[var(--vscode-sideBar-background,var(--vscode-editorWidget-background))] text-[var(--vscode-foreground)] border border-[var(--vscode-panel-border)] rounded shadow-sm mb-1">
+            <div class="flex items-center gap-1">
+                <!-- Import Button -->
+                <button 
+                    @click="showImportModal = true" 
+                    title="Import cURL Command" 
+                    class="px-2 py-1 rounded text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <span>Import cURL</span>
+                </button>
+
+                <!-- Export Button -->
+                <button 
+                    @click="showExportModal = true" 
+                    title="Export Code Snippet" 
+                    class="px-2 py-1 rounded text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    <span>Export Code</span>
+                </button>
+
+                <div class="h-3.5 w-px bg-[var(--vscode-panel-border)] mx-1"></div>
+
+                <!-- SSL Verification Button -->
+                <button 
+                    @click="rejectUnauthorized = !rejectUnauthorized" 
+                    :title="rejectUnauthorized ? 'SSL Verification: Strict (Enabled)' : 'SSL Verification: Disabled (Self-signed allowed)'" 
+                    class="px-2 py-1 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+                    :class="rejectUnauthorized ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-amber-700 dark:text-amber-400 font-bold'"
+                >
+                    <svg v-if="rejectUnauthorized" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                    </svg>
+                    <span>{{ rejectUnauthorized ? 'SSL Verified' : 'SSL Off' }}</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="flex mb-1 gap-2 items-center">
+            <div class="w-full grow">
                 <vscode-textfield v-model="description" placeholder="API Description" class="w-full"></vscode-textfield>
             </div>
             <div>
-            <vscode-single-select v-model="selectedEnvFile" class="w-40">
-                <vscode-option value="">-- No Env --</vscode-option>
-                <vscode-option v-for="env in environments" :key="env.file" :value="env.file">{{ env.name }}</vscode-option>
-            </vscode-single-select>
+                <vscode-single-select v-model="selectedEnvFile" class="w-40">
+                    <vscode-option value="">-- No Env --</vscode-option>
+                    <vscode-option v-for="env in environments" :key="env.file" :value="env.file">{{ env.name }}</vscode-option>
+                </vscode-single-select>
             </div>
         </div>
         <vscode-split-layout class="h-full grow">
@@ -20,6 +67,9 @@
                         <vscode-option value="POST">POST</vscode-option>
                         <vscode-option value="PUT">PUT</vscode-option>
                         <vscode-option value="DELETE">DELETE</vscode-option>
+                        <vscode-option value="PATCH">PATCH</vscode-option>
+                        <vscode-option value="HEAD">HEAD</vscode-option>
+                        <vscode-option value="OPTIONS">OPTIONS</vscode-option>
                     </vscode-single-select>
                     <vscode-textfield v-model="url" placeholder="http://localhost:3000" class="grow"></vscode-textfield>
                     <vscode-button v-if="!isSending" @click="sendRequest">Send</vscode-button>
@@ -102,6 +152,43 @@
                             </div>
                             <vscode-button @click="addHeader" class="ml-8">Add Header</vscode-button>
                         </vscode-tab-panel>
+
+                        <vscode-tab-header slot="header">Auth</vscode-tab-header>
+                        <vscode-tab-panel class="p-2 flex flex-col gap-3">
+                            <div class="flex gap-2 items-center">
+                                <label class="text-xs font-medium">Auth Type:</label>
+                                <vscode-single-select v-model="authType" class="w-48">
+                                    <vscode-option value="none">Inherit / None</vscode-option>
+                                    <vscode-option value="bearer">Bearer Token</vscode-option>
+                                    <vscode-option value="basic">Basic Auth</vscode-option>
+                                    <vscode-option value="apiKey">API Key</vscode-option>
+                                </vscode-single-select>
+                            </div>
+
+                            <div v-if="authType === 'bearer'" class="flex flex-col gap-2 max-w-lg">
+                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Bearer Token</label>
+                                <vscode-textfield v-model="authBearerToken" placeholder="Token (e.g. {{api_token}})"></vscode-textfield>
+                            </div>
+
+                            <div v-if="authType === 'basic'" class="flex flex-col gap-2 max-w-lg">
+                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Username</label>
+                                <vscode-textfield v-model="authBasicUsername" placeholder="Username"></vscode-textfield>
+                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Password</label>
+                                <vscode-textfield v-model="authBasicPassword" type="password" placeholder="Password"></vscode-textfield>
+                            </div>
+
+                            <div v-if="authType === 'apiKey'" class="flex flex-col gap-2 max-w-lg">
+                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Key</label>
+                                <vscode-textfield v-model="authApiKeyName" placeholder="Key Name (e.g. X-API-KEY)"></vscode-textfield>
+                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Value</label>
+                                <vscode-textfield v-model="authApiKeyValue" placeholder="Value (e.g. {{api_key}})"></vscode-textfield>
+                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Add To</label>
+                                <vscode-single-select v-model="authApiKeyAddTo" class="w-48">
+                                    <vscode-option value="header">Header</vscode-option>
+                                    <vscode-option value="query">Query Parameter</vscode-option>
+                                </vscode-single-select>
+                            </div>
+                        </vscode-tab-panel>
                     </vscode-tabs>
                 </div>
             </div>
@@ -128,12 +215,87 @@
                 </vscode-tabs>
             </div>
         </vscode-split-layout>
+
+        <!-- Export Code Modal -->
+        <div v-if="showExportModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] rounded-lg shadow-xl w-full max-w-2xl flex flex-col p-4 gap-3 max-h-[85vh]">
+                <div class="flex justify-between items-center border-b border-[var(--vscode-panel-border)] pb-2">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                        </svg>
+                        Export Code Snippet
+                    </h3>
+                    <vscode-button appearance="icon" aria-label="Close" title="Close" @click="showExportModal = false">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </vscode-button>
+                </div>
+                
+                <div class="flex gap-2 items-center">
+                    <label class="text-sm font-medium">Language:</label>
+                    <vscode-single-select v-model="selectedLanguage" class="w-56">
+                        <vscode-option value="curl">cURL</vscode-option>
+                        <vscode-option value="js-fetch">JavaScript (fetch)</vscode-option>
+                        <vscode-option value="js-axios">JavaScript (axios)</vscode-option>
+                        <vscode-option value="python-requests">Python (requests)</vscode-option>
+                        <vscode-option value="go">Go (net/http)</vscode-option>
+                        <vscode-option value="java">Java (HttpClient)</vscode-option>
+                    </vscode-single-select>
+                    <div class="grow"></div>
+                    <vscode-button @click="copyCodeSnippet">
+                        {{ copyStatusText }}
+                    </vscode-button>
+                </div>
+                
+                <div class="grow overflow-auto border border-[var(--vscode-panel-border)] rounded p-3 bg-[var(--vscode-textCodeBlock-background,var(--vscode-editor-background))] text-[var(--vscode-foreground)]">
+                    <pre class="font-mono text-xs whitespace-pre-wrap break-all select-all text-[var(--vscode-foreground)]">{{ generatedCode }}</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import cURL Modal -->
+        <div v-if="showImportModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] rounded-lg shadow-xl w-full max-w-2xl flex flex-col p-4 gap-3 max-h-[85vh]">
+                <div class="flex justify-between items-center border-b border-[var(--vscode-panel-border)] pb-2">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        Import from cURL
+                    </h3>
+                    <vscode-button appearance="icon" aria-label="Close" title="Close" @click="showImportModal = false">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </vscode-button>
+                </div>
+                
+                <p class="text-xs text-[var(--vscode-descriptionForeground)]">
+                    Paste a cURL command copied from Postman, Chrome/Firefox DevTools, or terminal below.
+                </p>
+
+                <vscode-textarea v-model="curlInputText" rows="8" placeholder="curl 'http://localhost:3000/api' -H 'Content-Type: application/json' --data '{...}'" class="w-full font-mono text-xs"></vscode-textarea>
+
+                <div v-if="importError" class="text-red-500 text-xs font-semibold">
+                    {{ importError }}
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-[var(--vscode-panel-border)]">
+                    <vscode-button appearance="secondary" @click="showImportModal = false">Cancel</vscode-button>
+                    <vscode-button @click="importCurlCommand">Import</vscode-button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import '@vscode-elements/elements';
+import { generateCode } from './codeGen.js';
+import { parseCurl } from './curlParser.js';
 
 // =========================================================================
 //  STATE, REFS, AND VARIABLES
@@ -143,6 +305,72 @@ import '@vscode-elements/elements';
     const description = ref('');
 const params = ref([{ key: '', value: '', enabled: true }]);
 const headers = ref([{ key: '', value: '', enabled: true }]);
+
+    // SSL Verification State
+    const rejectUnauthorized = ref(true);
+
+    // Auth Tab State
+    const authType = ref('none');
+    const authBearerToken = ref('');
+    const authBasicUsername = ref('');
+    const authBasicPassword = ref('');
+    const authApiKeyName = ref('');
+    const authApiKeyValue = ref('');
+    const authApiKeyAddTo = ref('header');
+
+    // Import cURL modal state
+    const showImportModal = ref(false);
+    const curlInputText = ref('');
+    const importError = ref('');
+
+    function importCurlCommand() {
+        importError.value = '';
+        try {
+            const parsed = parseCurl(curlInputText.value);
+            description.value = parsed.description || description.value;
+            method.value = parsed.method || 'GET';
+            url.value = parsed.url || '';
+            params.value = parsed.params && parsed.params.length > 0 ? parsed.params : [{ key: '', value: '', enabled: true }];
+            headers.value = parsed.headers && parsed.headers.length > 0 ? parsed.headers : [{ key: '', value: '', enabled: true }];
+            bodyType.value = parsed.bodyType || 'none';
+            bodyText.value = parsed.bodyText || '';
+            bodyUrlEncoded.value = parsed.bodyUrlEncoded && parsed.bodyUrlEncoded.length > 0 ? parsed.bodyUrlEncoded : [{ key: '', value: '', enabled: true }];
+            bodyMultipart.value = parsed.bodyMultipart && parsed.bodyMultipart.length > 0 ? parsed.bodyMultipart : [{ key: '', value: '', type: 'text', enabled: true }];
+            
+            if (parsed.auth) {
+                authType.value = parsed.auth.type || 'none';
+                authBearerToken.value = parsed.auth.bearer?.token || '';
+                authBasicUsername.value = parsed.auth.basic?.username || '';
+                authBasicPassword.value = parsed.auth.basic?.password || '';
+                authApiKeyName.value = parsed.auth.apiKey?.key || '';
+                authApiKeyValue.value = parsed.auth.apiKey?.value || '';
+                authApiKeyAddTo.value = parsed.auth.apiKey?.addTo || 'header';
+            }
+
+            curlInputText.value = '';
+            showImportModal.value = false;
+        } catch (err) {
+            importError.value = err.message || 'Failed to parse cURL command.';
+        }
+    }
+
+    // Export code modal state
+    const showExportModal = ref(false);
+    const selectedLanguage = ref('curl');
+    const copyStatusText = ref('Copy Code');
+    const currentEnvData = ref({});
+
+    const generatedCode = computed(() => {
+        return generateCode(requestData.value, selectedLanguage.value, currentEnvData.value);
+    });
+
+    function copyCodeSnippet() {
+        if (generatedCode.value) {
+            navigator.clipboard.writeText(generatedCode.value);
+            copyStatusText.value = 'Copied!';
+            setTimeout(() => { copyStatusText.value = 'Copy Code'; }, 2000);
+        }
+    }
 
     // New state for different body types
     const bodyType = ref('none');
@@ -204,6 +432,10 @@ onMounted(() => {
                 if (message.defaultFile) {
                     selectedEnvFile.value = message.defaultFile;
                 }
+                currentEnvData.value = message.envData || {};
+                break;
+            case 'env-data':
+                currentEnvData.value = message.envData || {};
                 break;
             case 'response-start':
                 chunkBuffers = [];
@@ -318,6 +550,13 @@ function getRequestData() {
             type: p.type,
             enabled: p.enabled,
         })),
+        auth: {
+            type: authType.value,
+            bearer: { token: authBearerToken.value },
+            basic: { username: authBasicUsername.value, password: authBasicPassword.value },
+            apiKey: { key: authApiKeyName.value, value: authApiKeyValue.value, addTo: authApiKeyAddTo.value }
+        },
+        rejectUnauthorized: rejectUnauthorized.value
     };
 }
 
@@ -337,6 +576,26 @@ function getRequestData() {
         bodyText.value = data.bodyText || '';
         bodyUrlEncoded.value = fromPlain(data.bodyUrlEncoded);
         bodyMultipart.value = Array.isArray(data.bodyMultipart) && data.bodyMultipart.length > 0 ? data.bodyMultipart : [{ key: '', value: '', type: 'text', enabled: true }];
+        
+        rejectUnauthorized.value = data.rejectUnauthorized !== false;
+        if (data.auth) {
+            authType.value = data.auth.type || 'none';
+            authBearerToken.value = data.auth.bearer?.token || '';
+            authBasicUsername.value = data.auth.basic?.username || '';
+            authBasicPassword.value = data.auth.basic?.password || '';
+            authApiKeyName.value = data.auth.apiKey?.key || '';
+            authApiKeyValue.value = data.auth.apiKey?.value || '';
+            authApiKeyAddTo.value = data.auth.apiKey?.addTo || 'header';
+        } else {
+            authType.value = 'none';
+            authBearerToken.value = '';
+            authBasicUsername.value = '';
+            authBasicPassword.value = '';
+            authApiKeyName.value = '';
+            authApiKeyValue.value = '';
+            authApiKeyAddTo.value = 'header';
+        }
+
         isLoading = false;
     }
 
@@ -366,9 +625,26 @@ async function sendRequest() {
         .filter(p => p.enabled && p.key)
         .map(p => ({ key: p.key, value: p.value, enabled: p.enabled }));
 
-    // 2. Build Headers (no changes here)
+    // 2. Build Headers & Auth
     const reqHeaders = {};
     headers.value.filter(h => h.enabled && h.key).forEach(h => { reqHeaders[h.key] = h.value; });
+
+    if (authType.value === 'bearer' && authBearerToken.value) {
+        reqHeaders['Authorization'] = `Bearer ${authBearerToken.value}`;
+    } else if (authType.value === 'basic' && (authBasicUsername.value || authBasicPassword.value)) {
+        try {
+            const b64 = btoa(`${authBasicUsername.value}:${authBasicPassword.value}`);
+            reqHeaders['Authorization'] = `Basic ${b64}`;
+        } catch {
+            /* ignore */
+        }
+    } else if (authType.value === 'apiKey' && authApiKeyName.value && authApiKeyValue.value) {
+        if (authApiKeyAddTo.value === 'query') {
+            activeParams.push({ key: authApiKeyName.value, value: authApiKeyValue.value, enabled: true });
+        } else {
+            reqHeaders[authApiKeyName.value] = authApiKeyValue.value;
+        }
+    }
     
     const hasContentType = Object.keys(reqHeaders).some(h => h.toLowerCase() === 'content-type');
     if (!hasContentType && bodyType.value !== 'none' && bodyType.value !== 'raw') {
@@ -417,8 +693,9 @@ async function sendRequest() {
         url: url.value,
         params: activeParams,
         headers: reqHeaders,
-        body: (method.value === 'GET' || !reqBodyPayload) ? undefined : reqBodyPayload,
-        envFile: selectedEnvFile.value
+        body: (['GET', 'HEAD'].includes(method.value) || !reqBodyPayload) ? undefined : reqBodyPayload,
+        envFile: selectedEnvFile.value,
+        rejectUnauthorized: rejectUnauthorized.value
     });
 }
 
