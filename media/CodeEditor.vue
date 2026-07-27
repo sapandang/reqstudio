@@ -327,11 +327,23 @@ const matches = computed(() => {
 function nextMatch() {
     if (matches.value.length === 0) return;
     currentMatchIndex.value = (currentMatchIndex.value + 1) % matches.value.length;
+    scrollToMatch();
 }
 
 function prevMatch() {
     if (matches.value.length === 0) return;
     currentMatchIndex.value = (currentMatchIndex.value - 1 + matches.value.length) % matches.value.length;
+    scrollToMatch();
+}
+
+function scrollToMatch() {
+    nextTick(() => {
+        if (!preRef.value) return;
+        const activeMark = preRef.value.querySelector('mark.token-search-match-active') || preRef.value.querySelector('mark.token-search-match');
+        if (activeMark) {
+            activeMark.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+        }
+    });
 }
 
 function escapeHtml(str) {
@@ -344,14 +356,34 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-function highlightTokens(code, lang) {
+function highlightTokens(code, lang, searchQuery = '', activeIndex = 0) {
     if (!code) return '';
-    const escaped = escapeHtml(code);
+    let escaped = escapeHtml(code);
 
+    // 1. Mark Search Matches with Placeholder Delimiters BEFORE Syntax Highlighting
+    const placeholders = [];
+    if (searchQuery) {
+        const escapedQuery = escapeHtml(searchQuery);
+        if (escapedQuery) {
+            const escapedRegex = new RegExp(`(${escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            let matchCounter = 0;
+            escaped = escaped.replace(escapedRegex, (m) => {
+                const isCurrent = matchCounter === activeIndex;
+                matchCounter++;
+                const cls = isCurrent ? 'token-search-match-active' : 'token-search-match';
+                const placeholder = `\uE000_${placeholders.length}_\uE001`;
+                placeholders.push(`<mark class="${cls}">${m}</mark>`);
+                return placeholder;
+            });
+        }
+    }
+
+    // 2. Perform Language Syntax Highlighting
     if (lang === 'json' || (code.trim().startsWith('{') || code.trim().startsWith('['))) {
-        return escaped.replace(
-            /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+        escaped = escaped.replace(
+            /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|\b\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?\b)/g,
             (match) => {
+                if (match.includes('\uE000')) return match;
                 let cls = 'token-number';
                 if (/^"/.test(match)) {
                     cls = /:$/.test(match) ? 'token-key' : 'token-string';
@@ -363,13 +395,18 @@ function highlightTokens(code, lang) {
                 return `<span class="${cls}">${match}</span>`;
             }
         );
-    }
-
-    if (lang === 'xml' || lang === 'html' || code.trim().startsWith('<')) {
-        return escaped
+    } else if (lang === 'xml' || lang === 'html' || code.trim().startsWith('<')) {
+        escaped = escaped
             .replace(/(&lt;\/?[a-zA-Z0-9:-]+)/g, '<span class="token-tag">$1</span>')
             .replace(/([a-zA-Z0-9:-]+)=/g, '<span class="token-attr">$1</span>=')
             .replace(/(&quot;.*?&quot;)/g, '<span class="token-string">$1</span>');
+    }
+
+    // 3. Restore Search Match Placeholders
+    if (placeholders.length > 0) {
+        escaped = escaped.replace(/\uE000_(\d+)_\uE001/g, (all, idx) => {
+            return placeholders[parseInt(idx, 10)] || all;
+        });
     }
 
     return escaped;
@@ -377,18 +414,10 @@ function highlightTokens(code, lang) {
 
 const renderedCode = computed(() => {
     const raw = localCode.value || '';
-    const highlighted = highlightTokens(raw, props.language);
-    
     if (!showSearch.value || !searchQuery.value) {
-        return highlighted;
+        return highlightTokens(raw, props.language);
     }
-
-    // Apply Search Highlight overlay if active
-    const q = searchQuery.value;
-    if (!q) return highlighted;
-
-    const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return highlighted.replace(regex, '<mark class="token-search-match">$1</mark>');
+    return highlightTokens(raw, props.language, searchQuery.value, currentMatchIndex.value);
 });
 </script>
 
@@ -472,9 +501,21 @@ const renderedCode = computed(() => {
 }
 
 :deep(.token-search-match) {
-    background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 179, 8, 0.4));
-    color: var(--vscode-editor-foreground);
-    outline: 1px solid var(--vscode-editor-findMatchBorder, #eab308);
+    background-color: var(--vscode-editor-findMatchHighlightBackground, #f59e0b) !important;
+    color: #000000 !important;
+    outline: 1px solid var(--vscode-editor-findMatchBorder, #d97706) !important;
     border-radius: 2px;
+    font-weight: 600 !important;
+    padding: 0 1px;
+}
+
+:deep(.token-search-match-active) {
+    background-color: var(--vscode-editor-findMatchBackground, #ea580c) !important;
+    color: #ffffff !important;
+    outline: 2px solid var(--vscode-focusBorder, #3b82f6) !important;
+    border-radius: 2px;
+    font-weight: 700 !important;
+    padding: 0 2px;
+    box-shadow: 0 0 4px rgba(234, 88, 12, 0.8);
 }
 </style>
