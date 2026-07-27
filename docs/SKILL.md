@@ -58,6 +58,8 @@ A `.req` file is a **JSON document** that describes an HTTP/REST API request for
 | `bodyText` | no | `string` | Raw payload. Used when `bodyType` is `raw`, `text/plain`, `application/json`, or `application/xml`. |
 | `bodyUrlEncoded` | no | `array` | Key-value pairs for `application/x-www-form-urlencoded`. Each item: `{ key, value, enabled: boolean }`. |
 | `bodyMultipart` | no | `array` | Parts for `multipart/form-data`. Each item: `{ key, value, type: "text" \| "file", enabled: boolean }`. For `type: "file"`, `value` is always `null` on disk (the file is selected in the UI, not stored in JSON). |
+| `auth` | no | `object` | Authentication configuration. `{ type: "none" \| "bearer" \| "basic" \| "apiKey", bearer: { token }, basic: { username, password }, apiKey: { key, value, addTo: "header" \| "query" } }`. |
+| `rejectUnauthorized` | no | `boolean` | SSL certificate validation flag (`true` by default, `false` to allow self-signed certificates). |
 
 ---
 
