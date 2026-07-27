@@ -348,8 +348,43 @@ function applyEnvToReqData(reqData, env) {
     };
 }
 
+function processAuthForReqData(rawReqData) {
+    if (!rawReqData || !rawReqData.auth || rawReqData.auth.type === 'none') {
+        return rawReqData;
+    }
+
+    const { type, bearer, basic, apiKey } = rawReqData.auth;
+    const reqData = {
+        ...rawReqData,
+        headers: [...(rawReqData.headers || [])],
+        params: [...(rawReqData.params || [])]
+    };
+
+    if (type === 'bearer' && bearer?.token) {
+        reqData.headers.push({ key: 'Authorization', value: `Bearer ${bearer.token}`, enabled: true });
+    } else if (type === 'basic' && (basic?.username || basic?.password)) {
+        const u = basic?.username || '';
+        const p = basic?.password || '';
+        try {
+            const b64 = typeof btoa === 'function' ? btoa(`${u}:${p}`) : Buffer.from(`${u}:${p}`).toString('base64');
+            reqData.headers.push({ key: 'Authorization', value: `Basic ${b64}`, enabled: true });
+        } catch {
+            /* ignore */
+        }
+    } else if (type === 'apiKey' && apiKey?.key && apiKey?.value) {
+        if (apiKey.addTo === 'query') {
+            reqData.params.push({ key: apiKey.key, value: apiKey.value, enabled: true });
+        } else {
+            reqData.headers.push({ key: apiKey.key, value: apiKey.value, enabled: true });
+        }
+    }
+
+    return reqData;
+}
+
 export function generateCode(rawReqData, target, env = {}) {
-    const reqData = applyEnvToReqData(rawReqData, env);
+    const withAuth = processAuthForReqData(rawReqData);
+    const reqData = applyEnvToReqData(withAuth, env);
     switch (target) {
         case 'curl': return generateCurl(reqData);
         case 'js-fetch': return generateJsFetch(reqData);

@@ -106,15 +106,10 @@ export function parseCurl(curlString) {
         }
 
         // Basic Auth flag
+        let basicAuthUser = '';
         if (token === '-u' || token === '--user') {
             if (i + 1 < tokens.length) {
-                const creds = tokens[++i];
-                try {
-                    const b64 = btoa(creds);
-                    headersList.push({ key: 'Authorization', value: `Basic ${b64}`, enabled: true });
-                } catch {
-                    /* ignore btoa error */
-                }
+                basicAuthUser = tokens[++i];
             }
             continue;
         }
@@ -270,9 +265,48 @@ export function parseCurl(curlString) {
         }
     }
 
-    // Default Method if not set explicitly
-    if (!method) {
-        method = (bodyType !== 'none') ? 'POST' : 'GET';
+    // Extract Auth setting if present in headersList or basicAuthUser
+    let auth = {
+        type: 'none',
+        bearer: { token: '' },
+        basic: { username: '', password: '' },
+        apiKey: { key: '', value: '', addTo: 'header' }
+    };
+
+    if (basicAuthUser) {
+        auth.type = 'basic';
+        const colonIdx = basicAuthUser.indexOf(':');
+        if (colonIdx !== -1) {
+            auth.basic.username = basicAuthUser.slice(0, colonIdx);
+            auth.basic.password = basicAuthUser.slice(colonIdx + 1);
+        } else {
+            auth.basic.username = basicAuthUser;
+        }
+    } else {
+        const authHeaderIdx = headersList.findIndex(h => h.key.toLowerCase() === 'authorization');
+        if (authHeaderIdx !== -1) {
+            const authVal = headersList[authHeaderIdx].value;
+            if (authVal.toLowerCase().startsWith('bearer ')) {
+                auth.type = 'bearer';
+                auth.bearer.token = authVal.slice(7).trim();
+                headersList.splice(authHeaderIdx, 1);
+            } else if (authVal.toLowerCase().startsWith('basic ')) {
+                auth.type = 'basic';
+                try {
+                    const decoded = atob(authVal.slice(6).trim());
+                    const colonIdx = decoded.indexOf(':');
+                    if (colonIdx !== -1) {
+                        auth.basic.username = decoded.slice(0, colonIdx);
+                        auth.basic.password = decoded.slice(colonIdx + 1);
+                    } else {
+                        auth.basic.username = decoded;
+                    }
+                    headersList.splice(authHeaderIdx, 1);
+                } catch {
+                    /* ignore */
+                }
+            }
+        }
     }
 
     return {
@@ -284,6 +318,7 @@ export function parseCurl(curlString) {
         bodyType,
         bodyText,
         bodyUrlEncoded,
-        bodyMultipart
+        bodyMultipart,
+        auth
     };
 }
