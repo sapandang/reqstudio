@@ -228,13 +228,15 @@ This is a single large Vue component that holds all UI state. Key sections:
 Template
   - Description field
   - Environment selector
-  - Method + URL + Send/Cancel + Export
+  - Method + URL + Send/Cancel + Import + Export
   - Tabs: Parameters | Body | Headers
   - Response pane: Status, Time, Body, Headers
+  - Import cURL Modal (Textarea input, parser, and error feedback)
   - Export Code Modal (Language selector: cURL, JS fetch, Axios, Python, Go, Java; preview & copy button)
 
 Helper Modules
   - `codeGen.js` — Code snippet generator converting request data (URL, method, headers, query params, body) into multi-language snippets.
+  - `curlParser.js` — Shell command tokenizer and cURL parser extracting method, URL, query params, headers, and body payloads.
 
 Script
   - Refs for all request fields

@@ -24,6 +24,11 @@
                     <vscode-textfield v-model="url" placeholder="http://localhost:3000" class="grow"></vscode-textfield>
                     <vscode-button v-if="!isSending" @click="sendRequest">Send</vscode-button>
                     <vscode-button v-else @click="cancelRequest" appearance="secondary">Cancel</vscode-button>
+                    <vscode-button appearance="icon" @click="showImportModal = true" title="Import cURL Command">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                    </vscode-button>
                     <vscode-button appearance="icon" @click="showExportModal = true" title="Export Code Snippet">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -172,6 +177,40 @@
                 </div>
             </div>
         </div>
+
+        <!-- Import cURL Modal -->
+        <div v-if="showImportModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] rounded-lg shadow-xl w-full max-w-2xl flex flex-col p-4 gap-3 max-h-[85vh]">
+                <div class="flex justify-between items-center border-b border-[var(--vscode-panel-border)] pb-2">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        Import from cURL
+                    </h3>
+                    <vscode-button appearance="icon" aria-label="Close" title="Close" @click="showImportModal = false">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </vscode-button>
+                </div>
+                
+                <p class="text-xs text-[var(--vscode-descriptionForeground)]">
+                    Paste a cURL command copied from Postman, Chrome/Firefox DevTools, or terminal below.
+                </p>
+
+                <vscode-textarea v-model="curlInputText" rows="8" placeholder="curl 'http://localhost:3000/api' -H 'Content-Type: application/json' --data '{...}'" class="w-full font-mono text-xs"></vscode-textarea>
+
+                <div v-if="importError" class="text-red-500 text-xs font-semibold">
+                    {{ importError }}
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-[var(--vscode-panel-border)]">
+                    <vscode-button appearance="secondary" @click="showImportModal = false">Cancel</vscode-button>
+                    <vscode-button @click="importCurlCommand">Import</vscode-button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -179,6 +218,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import '@vscode-elements/elements';
 import { generateCode } from './codeGen.js';
+import { parseCurl } from './curlParser.js';
 
 // =========================================================================
 //  STATE, REFS, AND VARIABLES
@@ -188,6 +228,32 @@ import { generateCode } from './codeGen.js';
     const description = ref('');
 const params = ref([{ key: '', value: '', enabled: true }]);
 const headers = ref([{ key: '', value: '', enabled: true }]);
+
+    // Import cURL modal state
+    const showImportModal = ref(false);
+    const curlInputText = ref('');
+    const importError = ref('');
+
+    function importCurlCommand() {
+        importError.value = '';
+        try {
+            const parsed = parseCurl(curlInputText.value);
+            description.value = parsed.description || description.value;
+            method.value = parsed.method || 'GET';
+            url.value = parsed.url || '';
+            params.value = parsed.params && parsed.params.length > 0 ? parsed.params : [{ key: '', value: '', enabled: true }];
+            headers.value = parsed.headers && parsed.headers.length > 0 ? parsed.headers : [{ key: '', value: '', enabled: true }];
+            bodyType.value = parsed.bodyType || 'none';
+            bodyText.value = parsed.bodyText || '';
+            bodyUrlEncoded.value = parsed.bodyUrlEncoded && parsed.bodyUrlEncoded.length > 0 ? parsed.bodyUrlEncoded : [{ key: '', value: '', enabled: true }];
+            bodyMultipart.value = parsed.bodyMultipart && parsed.bodyMultipart.length > 0 ? parsed.bodyMultipart : [{ key: '', value: '', type: 'text', enabled: true }];
+            
+            curlInputText.value = '';
+            showImportModal.value = false;
+        } catch (err) {
+            importError.value = err.message || 'Failed to parse cURL command.';
+        }
+    }
 
     // Export code modal state
     const showExportModal = ref(false);
