@@ -18,17 +18,20 @@ Stop switching windows to test your APIs. Keep your API requests version-control
 
 ## Features
 
-* **📝 Custom Editor for `.req` Files**: A full-featured UI for any file ending in `.req`.
-* ** graphical interface**: Build requests visually—no need to write JSON by hand.
-* **✔️ All HTTP Methods**: Supports GET, POST, PUT, DELETE, and more.
-* **⚙️ Full Request Control**: Manage URL parameters, headers, and complex request bodies with ease.
-* **🔄 Multiple Body Types**: Send data as JSON, XML, Text, x-www-form-urlencoded, and multipart/form-data with file uploads.
-* **📁 Binary File Uploads**: Send binary data directly from a file.
-* **✅ Toggable Parameters**: Temporarily enable or disable params and headers with a single click without deleting them.
-* **🌊 Streaming Responses**: Handles large API responses gracefully by streaming the data, keeping the UI responsive.
-* **📊 Rich Response Viewer**: View response status, time, headers, and the formatted response body.
-* **🔧 Environment Variables**: Supports environment variables that can be substituted into URLs, headers, and request bodies.
-* **💾 Version Control Friendly**: Since requests are saved as simple JSON in `.req` files, you can commit them to Git and track changes over time.
+* **📝 Custom Editor for `.req` Files**: A full-featured, VS Code-themed UI for creating and managing `.req` API files visually.
+* **📥 Import from cURL**: Paste cURL commands directly from Chrome/Firefox DevTools, Postman, or terminal to auto-populate request method, URL, headers, query params, auth, and payload body.
+* **💻 Multi-Language Code Snippet Export**: Export any request to ready-to-use code snippets in cURL, JavaScript (`fetch`, `axios`), Python (`requests`), Go (`net/http`), and Java (`HttpClient`).
+* **🍪 Automatic Cookie Jar & Session Tracking**: Automatically capture `Set-Cookie` response headers into named Cookie Jars (`Default Jar`, `user1_session`, `user2_session`) with instant multi-session switching and a built-in Cookie Manager.
+* **✔️ All HTTP Methods**: Full support for `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, and `OPTIONS`.
+* **⚙️ Full Request Control**: Manage URL query parameters, custom headers, and auth credentials (`Bearer`, `Basic`, `ApiKey`) with ease.
+* **🔄 Multiple Body Types**: Send data as JSON, XML, Text, `x-www-form-urlencoded`, and `multipart/form-data` with file uploads.
+* **🔍 Built-in Code Editor & Response Viewer**: Lightweight code editor with line numbers, syntax highlighting, JSON/XML prettifying, soft line wrapping, **Undo/Redo** (`Ctrl+Z`/`Ctrl+Y`), and **Find & Replace** (`Ctrl+F`).
+* **📁 Binary File Uploads**: Send binary data directly from files.
+* **✅ Togglable Parameters**: Temporarily enable or disable params, headers, and form fields with a single click.
+* **🌊 Streaming Responses**: Handles large API responses gracefully by streaming data chunks without freezing the UI.
+* **🔧 Environment Variables (`.reqenv`)**: Substitute variables (e.g. `{{URL}}`, `{{token}}`) into URLs, headers, auth, query params, and request bodies using workspace `.reqenv` files.
+* **🔒 SSL Verification Control**: Easily toggle strict SSL certificate verification or allow self-signed certificates.
+* **💾 Version Control Friendly**: Requests are saved as simple, readable JSON in `.req` files, making them git-friendly and easy to commit alongside your codebase.
 
 ---
 

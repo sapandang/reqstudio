@@ -82,11 +82,25 @@ export function parseCurl(curlString) {
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
 
-        // Method flags
+        // Method flags (-X POST, --request POST, --request=POST, -XPOST, -X=POST, -I, --head)
         if (token === '-X' || token === '--request') {
             if (i + 1 < tokens.length) {
                 method = tokens[++i].toUpperCase();
             }
+            continue;
+        }
+        if (token.startsWith('--request=')) {
+            method = token.substring(10).trim().toUpperCase();
+            continue;
+        }
+        if (token.startsWith('-X') && token.length > 2) {
+            let m = token.substring(2).trim();
+            if (m.startsWith('=')) m = m.substring(1).trim();
+            if (m) method = m.toUpperCase();
+            continue;
+        }
+        if (token === '-I' || token === '--head') {
+            method = 'HEAD';
             continue;
         }
 
@@ -306,6 +320,15 @@ export function parseCurl(curlString) {
                     /* ignore */
                 }
             }
+        }
+    }
+
+    // Infer HTTP method if not explicitly specified by -X / --request
+    if (!method) {
+        if (dataPayloads.length > 0 || formPayloads.length > 0 || urlEncodedPayloads.length > 0) {
+            method = 'POST';
+        } else {
+            method = 'GET';
         }
     }
 
