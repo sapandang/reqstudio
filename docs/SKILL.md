@@ -32,7 +32,14 @@ A `.req` file is a **JSON document** that describes an HTTP/REST API request for
   "bodyMultipart": [
     { "key": "file", "value": null, "type": "file", "enabled": true },
     { "key": "name", "value": "John", "type": "text", "enabled": true }
-  ]
+  ],
+  "auth": {
+    "type": "none | bearer | basic | apiKey",
+    "bearer": { "token": "{{token}}" },
+    "basic": { "username": "admin", "password": "{{password}}" },
+    "apiKey": { "key": "X-API-KEY", "value": "{{key}}", "addTo": "header | query" }
+  },
+  "rejectUnauthorized": true
 }
 ```
 

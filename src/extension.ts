@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as https from 'https';
 import FormData from 'form-data';
 import fetch, { Response } from 'node-fetch';
 
@@ -281,11 +282,15 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                 try {
                     const { body: processedBody, headers: finalHeaders } = await this.prepareBodyAndHeaders(message);
 
+                    const rejectUnauthorized = message.rejectUnauthorized !== false;
+                    const agent = message.url.startsWith('https:') ? new https.Agent({ rejectUnauthorized }) : undefined;
+
                     const res = await fetch(message.url, {
                         method,
                         headers: finalHeaders,
                         body: (method === 'GET' || method === 'HEAD') ? undefined : processedBody,
-                        signal: controller.signal
+                        signal: controller.signal,
+                        agent
                     }) as Response;
 
                     if (this._isStale(webviewPanel, generation)) { return; }
