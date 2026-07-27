@@ -105,8 +105,13 @@
                             </div>
                             
                             <div class="grow px-2 py-1 h-full">
-                                <vscode-textarea v-if="['raw', 'text/plain', 'application/json', 'application/xml'].includes(bodyType)"
-                                    v-model="bodyText" class="w-full h-full" rows="6" placeholder="Request body..."></vscode-textarea>
+                                <CodeEditor 
+                                    v-if="['raw', 'text/plain', 'application/json', 'application/xml'].includes(bodyType)"
+                                    v-model="bodyText" 
+                                    :language="requestLanguage" 
+                                    placeholder="Request body..." 
+                                    class="w-full h-full min-h-[180px]" 
+                                />
 
                                 <div v-if="bodyType === 'application/x-www-form-urlencoded'">
                                     <div v-for="(item, idx) in bodyUrlEncoded" :key="idx" class="flex gap-1 py-1 items-center">
@@ -201,7 +206,7 @@
                 <vscode-tabs selected-index="0" class="w-full h-full grow p-2">
                     <vscode-tab-header slot="header">Response Body</vscode-tab-header>
                     <vscode-tab-panel class="h-full">
-                        <vscode-textarea :value="responseBody" readonly class="w-full h-full"></vscode-textarea>
+                        <CodeEditor :modelValue="responseBody" readonly :language="responseLanguage" class="w-full h-full" />
                     </vscode-tab-panel>
                     <vscode-tab-header slot="header">Response Headers</vscode-tab-header>
                     <vscode-tab-panel>
@@ -296,6 +301,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import '@vscode-elements/elements';
 import { generateCode } from './codeGen.js';
 import { parseCurl } from './curlParser.js';
+import CodeEditor from './CodeEditor.vue';
 
 // =========================================================================
 //  STATE, REFS, AND VARIABLES
@@ -318,7 +324,22 @@ const headers = ref([{ key: '', value: '', enabled: true }]);
     const authApiKeyValue = ref('');
     const authApiKeyAddTo = ref('header');
 
-    // Import cURL modal state
+    // Language Mode Computeds for CodeEditor
+    const requestLanguage = computed(() => {
+        if (bodyType.value === 'application/json') return 'json';
+        if (bodyType.value === 'application/xml') return 'xml';
+        if (bodyType.value === 'text/plain') return 'text';
+        return 'text';
+    });
+
+    const responseLanguage = computed(() => {
+        const contentType = (responseHeaders.value?.['content-type'] || responseHeaders.value?.['Content-Type'] || '').toLowerCase();
+        const text = (responseBody.value || '').trim();
+        if (contentType.includes('json') || text.startsWith('{') || text.startsWith('[')) return 'json';
+        if (contentType.includes('xml') || text.startsWith('<?xml') || (text.startsWith('<') && text.endsWith('>'))) return 'xml';
+        if (contentType.includes('html')) return 'html';
+        return 'text';
+    });
     const showImportModal = ref(false);
     const curlInputText = ref('');
     const importError = ref('');

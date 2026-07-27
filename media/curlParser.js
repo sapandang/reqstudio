@@ -73,6 +73,7 @@ export function parseCurl(curlString) {
 
     let method = null;
     let rawUrl = '';
+    let basicAuthUser = '';
     const headersList = [];
     const dataPayloads = [];
     const urlEncodedPayloads = [];
@@ -106,7 +107,6 @@ export function parseCurl(curlString) {
         }
 
         // Basic Auth flag
-        let basicAuthUser = '';
         if (token === '-u' || token === '--user') {
             if (i + 1 < tokens.length) {
                 basicAuthUser = tokens[++i];
