@@ -825,6 +825,7 @@ async function sendRequest() {
 
     const requestPayload = {
         ...getRequestData(),
+        envFile: selectedEnvFile.value,
         rejectUnauthorized: rejectUnauthorized.value,
         cookieJarName: selectedJarName.value
     };

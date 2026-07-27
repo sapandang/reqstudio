@@ -217,35 +217,104 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
             return;
         }
 
-        message.url = this._substituteEnvVars(message.url, env);
+        const sub = (text: any) => typeof text === 'string' ? this._substituteEnvVars(text, env) : text;
 
-        const newHeaders: Record<string, string> = {};
-        for (const [hKey, hVal] of Object.entries(message.headers ?? {})) {
-            newHeaders[this._substituteEnvVars(hKey, env)] = this._substituteEnvVars(hVal as string, env);
+        // 1. Substitute URL
+        if (message.url) {
+            message.url = sub(message.url);
         }
-        message.headers = newHeaders;
 
-        if (typeof message.body === 'string') {
-            message.body = this._substituteEnvVars(message.body, env);
-        } else if (message.body && typeof message.body === 'object' && message.body.type === 'multipart/form-data') {
-            for (const part of message.body.data ?? []) {
-                part.key = this._substituteEnvVars(part.key, env);
-                if (part.type === 'text' && typeof part.value === 'string') {
-                    part.value = this._substituteEnvVars(part.value, env);
+        // 2. Substitute Query Params Array
+        if (Array.isArray(message.params)) {
+            for (const p of message.params) {
+                if (p) {
+                    p.key = sub(p.key);
+                    p.value = sub(p.value);
                 }
             }
         }
 
+        // 3. Substitute Headers Array or Object
+        const processedHeaders: Record<string, string> = {};
+        if (Array.isArray(message.headers)) {
+            for (const h of message.headers) {
+                if (h && h.enabled && h.key) {
+                    processedHeaders[sub(h.key)] = sub(h.value ?? '');
+                }
+            }
+        } else if (message.headers && typeof message.headers === 'object') {
+            for (const [hKey, hVal] of Object.entries(message.headers)) {
+                processedHeaders[sub(hKey)] = sub(hVal as string);
+            }
+        }
+
+        // 4. Substitute Auth Credentials & Inject Headers/Query
+        if (message.auth) {
+            const authType = message.auth.type;
+            if (authType === 'bearer' && message.auth.bearer?.token) {
+                const token = sub(message.auth.bearer.token);
+                processedHeaders['Authorization'] = `Bearer ${token}`;
+            } else if (authType === 'basic' && (message.auth.basic?.username || message.auth.basic?.password)) {
+                const username = sub(message.auth.basic.username || '');
+                const password = sub(message.auth.basic.password || '');
+                try {
+                    const b64 = Buffer.from(`${username}:${password}`).toString('base64');
+                    processedHeaders['Authorization'] = `Basic ${b64}`;
+                } catch {}
+            } else if (authType === 'apiKey' && message.auth.apiKey?.key && message.auth.apiKey?.value) {
+                const key = sub(message.auth.apiKey.key);
+                const val = sub(message.auth.apiKey.value);
+                if (message.auth.apiKey.addTo === 'query') {
+                    if (!Array.isArray(message.params)) message.params = [];
+                    message.params.push({ key, value: val, enabled: true });
+                } else {
+                    processedHeaders[key] = val;
+                }
+            }
+        }
+
+        message.headers = processedHeaders;
+
+        // 5. Append Query Params to URL
         if (Array.isArray(message.params)) {
             const activeParams = message.params
-                .filter((p: any) => p.enabled && p.key)
-                .map((p: any) => [
-                    this._substituteEnvVars(p.key, env),
-                    this._substituteEnvVars(p.value, env)
-                ]);
+                .filter((p: any) => p && p.enabled && p.key)
+                .map((p: any) => [sub(p.key), sub(p.value)]);
             if (activeParams.length > 0) {
                 const qs = new URLSearchParams(activeParams).toString();
                 message.url += (message.url.includes('?') ? '&' : '?') + qs;
+            }
+        }
+
+        // 6. Substitute Body Payloads
+        const bodyType = message.bodyType || 'none';
+        if (['raw', 'text/plain', 'application/json', 'application/xml'].includes(bodyType)) {
+            if (typeof message.bodyText === 'string') {
+                message.bodyText = sub(message.bodyText);
+            }
+            const hasContentType = Object.keys(processedHeaders).some(h => h.toLowerCase() === 'content-type');
+            if (!hasContentType && bodyType !== 'raw') {
+                processedHeaders['Content-Type'] = bodyType;
+            }
+        } else if (bodyType === 'application/x-www-form-urlencoded' && Array.isArray(message.bodyUrlEncoded)) {
+            for (const item of message.bodyUrlEncoded) {
+                if (item) {
+                    item.key = sub(item.key);
+                    item.value = sub(item.value);
+                }
+            }
+            const hasContentType = Object.keys(processedHeaders).some(h => h.toLowerCase() === 'content-type');
+            if (!hasContentType) {
+                processedHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+            }
+        } else if (bodyType === 'multipart/form-data' && Array.isArray(message.bodyMultipart)) {
+            for (const part of message.bodyMultipart) {
+                if (part) {
+                    part.key = sub(part.key);
+                    if (part.type === 'text' && typeof part.value === 'string') {
+                        part.value = sub(part.value);
+                    }
+                }
             }
         }
     }
@@ -274,36 +343,44 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
 
     // prepareBodyAndHeaders (No changes)
     private async prepareBodyAndHeaders(message: any) {
-        const { headers, body } = message;
-        let processedBody: any = body;
+        const { headers, bodyType, bodyText, bodyUrlEncoded, bodyMultipart, bodyBinaryFile } = message;
+        let processedBody: any = undefined;
         let finalHeaders: any = { ...headers };
 
-        if (body && typeof body === 'object') {
-            if (body.type === 'application/octet-stream') {
-                processedBody = Buffer.from(body.data.base64content, 'base64');
-            } else if (body.type === 'multipart/form-data') {
-                const form = new FormData();
-                for (const part of body.data) {
-                    if (part.enabled) {
-                        if (part.type === 'file' && part.value?.base64content) {
-                            const buffer = Buffer.from(part.value.base64content, 'base64');
-                            form.append(part.key, buffer, { filename: part.value.name });
-                        } else if (part.type === 'text') {
-                            form.append(part.key, part.value);
-                        }
-                    }
+        if (bodyType === 'application/x-www-form-urlencoded' && Array.isArray(bodyUrlEncoded)) {
+            const urlParams = new URLSearchParams();
+            for (const item of bodyUrlEncoded) {
+                if (item && item.enabled && item.key) {
+                    urlParams.append(item.key, item.value || '');
                 }
-                // Remove any user-set Content-Type so the generated boundary wins
-                const cleanedHeaders: Record<string, string> = {};
-                for (const [k, v] of Object.entries(headers ?? {})) {
-                    if (k.toLowerCase() !== 'content-type') {
-                        cleanedHeaders[k] = v as string;
-                    }
-                }
-                finalHeaders = { ...cleanedHeaders, ...form.getHeaders() };
-                processedBody = await form.getBuffer();
             }
+            processedBody = urlParams.toString();
+        } else if (bodyType === 'multipart/form-data' && Array.isArray(bodyMultipart)) {
+            const form = new FormData();
+            for (const part of bodyMultipart) {
+                if (part && part.enabled && part.key) {
+                    if (part.type === 'file' && part.value?.base64content) {
+                        const buffer = Buffer.from(part.value.base64content, 'base64');
+                        form.append(part.key, buffer, { filename: part.value.name });
+                    } else if (part.type === 'text') {
+                        form.append(part.key, part.value || '');
+                    }
+                }
+            }
+            const cleanedHeaders: Record<string, string> = {};
+            for (const [k, v] of Object.entries(headers ?? {})) {
+                if (k.toLowerCase() !== 'content-type') {
+                    cleanedHeaders[k] = v as string;
+                }
+            }
+            finalHeaders = { ...cleanedHeaders, ...form.getHeaders() };
+            processedBody = await form.getBuffer();
+        } else if (bodyType === 'application/octet-stream' && bodyBinaryFile?.base64content) {
+            processedBody = Buffer.from(bodyBinaryFile.base64content, 'base64');
+        } else if (['raw', 'text/plain', 'application/json', 'application/xml'].includes(bodyType)) {
+            processedBody = bodyText || '';
         }
+
         return { body: processedBody, headers: finalHeaders };
     }
 
