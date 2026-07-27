@@ -1,10 +1,15 @@
 <template>
     <div class="h-screen w-full p-2 flex flex-col">
-        <div class="flex justify-end mb-2 gap-2 items-center">
+        <div class="flex  mb-2 gap-2 items-center">
+                <div class="w-full grow">
+                <vscode-textfield v-model="description" placeholder="API Description" class="w-full"></vscode-textfield>
+            </div>
+            <div>
             <vscode-single-select v-model="selectedEnvFile" class="w-40">
                 <vscode-option value="">-- No Env --</vscode-option>
                 <vscode-option v-for="env in environments" :key="env.file" :value="env.file">{{ env.name }}</vscode-option>
             </vscode-single-select>
+            </div>
         </div>
         <vscode-split-layout class="h-full grow">
             <div slot="start" class="flex flex-col gap-2">
@@ -133,8 +138,9 @@ import '@vscode-elements/elements';
 // =========================================================================
 //  STATE, REFS, AND VARIABLES
 // =========================================================================
-const method = ref('GET');
-const url = ref('');
+    const method = ref('GET');
+    const url = ref('');
+    const description = ref('');
 const params = ref([{ key: '', value: '', enabled: true }]);
 const headers = ref([{ key: '', value: '', enabled: true }]);
 
@@ -298,6 +304,7 @@ function getRequestData() {
     });
 
     return {
+        description: description.value,
         method: method.value,
         url: url.value,
         params: toPlain(params.value),
@@ -321,6 +328,7 @@ function getRequestData() {
         }
         isLoading = true;
         const fromPlain = (arr) => Array.isArray(arr) && arr.length > 0 ? arr : [{ key: '', value: '', enabled: true }];
+        description.value = data.description || '';
         method.value = data.method || 'GET';
         url.value = data.url || '';
         params.value = fromPlain(data.params);
