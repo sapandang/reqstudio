@@ -173,6 +173,8 @@ VS Code extensions run in a **Node.js Extension Host** process. The editor UI ru
 | `bodyText` | `string` | Payload for raw/text/json/xml |
 | `bodyUrlEncoded` | `Array<{key, value, enabled}>` | Form fields |
 | `bodyMultipart` | `Array<{key, value, type, enabled}>` | Multipart parts; `type` = `text` or `file`. Files are **not** saved in the `.req` file (`value` is `null` on disk). |
+| `auth` | `object` | Authentication configuration (`type`, `bearer`, `basic`, `apiKey`) |
+| `rejectUnauthorized` | `boolean` | SSL certificate validation flag (`true` by default, `false` to allow self-signed certificates) |
 
 > **File uploads:** When a user selects a file in the webview, it is read via `FileReader` to base64, sent to the extension host inside the `send-request` message, and converted back to a `Buffer` before `node-fetch`. The base64 content is **not** persisted to the `.req` file.
 

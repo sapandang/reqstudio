@@ -1,0 +1,34 @@
+{
+  "description": "",
+  "method": "GET",
+  "url": "",
+  "params": [],
+  "headers": [],
+  "bodyType": "none",
+  "bodyText": "",
+  "bodyUrlEncoded": [],
+  "bodyMultipart": [
+    {
+      "key": "",
+      "value": "",
+      "type": "text",
+      "enabled": true
+    }
+  ],
+  "auth": {
+    "type": "none",
+    "bearer": {
+      "token": ""
+    },
+    "basic": {
+      "username": "",
+      "password": ""
+    },
+    "apiKey": {
+      "key": "",
+      "value": "",
+      "addTo": "header"
+    }
+  },
+  "rejectUnauthorized": true
+}
