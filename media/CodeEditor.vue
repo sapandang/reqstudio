@@ -30,6 +30,16 @@
                     Format
                 </button>
 
+                <!-- Word Wrap Toggle Button -->
+                <button 
+                    @click="isWordWrap = !isWordWrap" 
+                    title="Toggle Word Wrap" 
+                    class="px-2 py-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] text-[var(--vscode-foreground)] transition-colors font-medium text-[11px]"
+                    :class="{ 'bg-[var(--vscode-toolbar-activeBackground)] font-bold': isWordWrap }"
+                >
+                    Wrap
+                </button>
+
                 <!-- Copy Code Button -->
                 <button 
                     @click="copyCode" 
@@ -78,19 +88,21 @@
                 <textarea 
                     v-if="!readonly"
                     ref="textareaRef"
-                    :value="modelValue"
+                    :value="localCode"
                     @input="onInput"
                     @scroll="onScroll"
                     :placeholder="placeholder"
                     spellcheck="false"
                     class="editor-textarea absolute inset-0 w-full h-full p-2 font-mono text-xs leading-5 outline-none resize-none bg-transparent caret-[var(--vscode-editor-foreground)] text-transparent z-10"
+                    :class="{ 'whitespace-pre-wrap break-all': isWordWrap, 'whitespace-pre': !isWordWrap }"
                 ></textarea>
 
                 <!-- Syntax Highlighted Display & Readonly Viewer -->
                 <pre 
                     ref="preRef" 
                     @scroll="onScroll"
-                    class="editor-highlight absolute inset-0 w-full h-full p-2 font-mono text-xs leading-5 overflow-auto m-0 whitespace-pre pointer-events-auto bg-[var(--vscode-editor-background)] text-[var(--vscode-editor-foreground)]"
+                    class="editor-highlight absolute inset-0 w-full h-full p-2 font-mono text-xs leading-5 overflow-auto m-0 pointer-events-auto bg-[var(--vscode-editor-background)] text-[var(--vscode-editor-foreground)]"
+                    :class="{ 'whitespace-pre-wrap break-all': isWordWrap, 'whitespace-pre': !isWordWrap }"
                     v-html="renderedCode"
                 ></pre>
             </div>
@@ -110,6 +122,13 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue']);
 
+const localCode = ref(props.modelValue || '');
+const isWordWrap = ref(false);
+
+watch(() => props.modelValue, (newVal) => {
+    localCode.value = newVal || '';
+}, { immediate: true });
+
 const formatError = ref('');
 const copyStatus = ref('Copy');
 const showSearch = ref(false);
@@ -122,12 +141,13 @@ const gutterRef = ref(null);
 const searchInputRef = ref(null);
 
 const lineCount = computed(() => {
-    const val = props.modelValue || '';
+    const val = localCode.value || '';
     if (!val) return 1;
     return val.split('\n').length;
 });
 
 function onInput(e) {
+    localCode.value = e.target.value;
     emit('update:modelValue', e.target.value);
 }
 
@@ -146,8 +166,8 @@ function onScroll(e) {
 }
 
 function copyCode() {
-    if (props.modelValue) {
-        navigator.clipboard.writeText(props.modelValue);
+    if (localCode.value) {
+        navigator.clipboard.writeText(localCode.value);
         copyStatus.value = 'Copied!';
         setTimeout(() => { copyStatus.value = 'Copy'; }, 2000);
     }
@@ -155,20 +175,27 @@ function copyCode() {
 
 function formatCode() {
     formatError.value = '';
-    const code = props.modelValue || '';
+    const code = localCode.value || '';
     if (!code.trim()) return;
 
-    if (props.language === 'json') {
+    if (props.language === 'json' || code.trim().startsWith('{') || code.trim().startsWith('[')) {
         try {
             const parsed = JSON.parse(code);
             const formatted = JSON.stringify(parsed, null, 2);
-            emit('update:modelValue', formatted);
+            localCode.value = formatted;
+            if (!props.readonly) {
+                emit('update:modelValue', formatted);
+            }
         } catch (err) {
             formatError.value = 'Invalid JSON';
             setTimeout(() => { formatError.value = ''; }, 3000);
         }
-    } else if (['xml', 'html'].includes(props.language)) {
-        emit('update:modelValue', formatXml(code));
+    } else if (['xml', 'html'].includes(props.language) || code.trim().startsWith('<')) {
+        const formatted = formatXml(code);
+        localCode.value = formatted;
+        if (!props.readonly) {
+            emit('update:modelValue', formatted);
+        }
     }
 }
 
@@ -201,9 +228,9 @@ function openSearch() {
 }
 
 const matches = computed(() => {
-    if (!searchQuery.value || !props.modelValue) return [];
+    if (!searchQuery.value || !localCode.value) return [];
     const query = searchQuery.value.toLowerCase();
-    const text = props.modelValue.toLowerCase();
+    const text = localCode.value.toLowerCase();
     const result = [];
     let idx = text.indexOf(query);
     while (idx !== -1) {
@@ -237,7 +264,7 @@ function highlightTokens(code, lang) {
     if (!code) return '';
     const escaped = escapeHtml(code);
 
-    if (lang === 'json') {
+    if (lang === 'json' || (code.trim().startsWith('{') || code.trim().startsWith('['))) {
         return escaped.replace(
             /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
             (match) => {
@@ -254,7 +281,7 @@ function highlightTokens(code, lang) {
         );
     }
 
-    if (lang === 'xml' || lang === 'html') {
+    if (lang === 'xml' || lang === 'html' || code.trim().startsWith('<')) {
         return escaped
             .replace(/(&lt;\/?[a-zA-Z0-9:-]+)/g, '<span class="token-tag">$1</span>')
             .replace(/([a-zA-Z0-9:-]+)=/g, '<span class="token-attr">$1</span>=')
@@ -265,7 +292,7 @@ function highlightTokens(code, lang) {
 }
 
 const renderedCode = computed(() => {
-    const raw = props.modelValue || '';
+    const raw = localCode.value || '';
     const highlighted = highlightTokens(raw, props.language);
     
     if (!showSearch.value || !searchQuery.value) {

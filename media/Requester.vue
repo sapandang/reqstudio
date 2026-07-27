@@ -477,14 +477,26 @@ onMounted(() => {
                 const all = new Uint8Array(chunkBuffers.reduce((sum, arr) => sum + arr.length, 0));
                 let offset = 0;
                 for (const arr of chunkBuffers) { all.set(arr, offset); offset += arr.length; }
-                responseBody.value = tryDecodeToString(all);
+                const rawDecoded = tryDecodeToString(all);
+                try {
+                    const parsedJson = JSON.parse(rawDecoded);
+                    responseBody.value = JSON.stringify(parsedJson, null, 2);
+                } catch {
+                    responseBody.value = rawDecoded;
+                }
                 if (requestStartTime) { responseTime.value = Math.round(performance.now() - requestStartTime); }
                 isSending.value = false;
                 break;
             case 'response':
                 statusCode.value = message.status;
-                responseBody.value = message.response;
                 responseHeaders.value = message.headers || null;
+                const rawResp = message.response || '';
+                try {
+                    const parsedJson = JSON.parse(rawResp);
+                    responseBody.value = JSON.stringify(parsedJson, null, 2);
+                } catch {
+                    responseBody.value = rawResp;
+                }
                 if (requestStartTime) { responseTime.value = Math.round(performance.now() - requestStartTime); }
                 isSending.value = false;
                 break;
