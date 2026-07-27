@@ -31,12 +31,26 @@
 
                     <div class="h-3.5 w-px bg-[var(--vscode-panel-border)] mx-1"></div>
 
+                    <!-- Jar Selector -->
+                    <div class="flex gap-2 items-center text-xs">
+                        <span class="text-[11px] font-medium text-[var(--vscode-descriptionForeground)]">Jar:</span>
+                        <vscode-single-select :value="selectedJarName" @change="selectedJarName = $event.target.value" class="w-36">
+                            <vscode-option value="none">-- No Jar --</vscode-option>
+                            <vscode-option v-for="jar in jarNames" :key="jar" :value="jar">{{ jar }}</vscode-option>
+                        </vscode-single-select>
+                        <ReqButton variant="icon" title="Manage Cookie Jars" @click="showCookieModal = true">
+                            <span class="text-xs">🍪</span>
+                        </ReqButton>
+                    </div>
+
                     <!-- SSL Verification Button -->
                     <button 
-                        @click="rejectUnauthorized = !rejectUnauthorized" 
-                        :title="rejectUnauthorized ? 'SSL Verification: Strict (Enabled)' : 'SSL Verification: Disabled (Self-signed allowed)'" 
-                        class="px-2 py-1 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-                        :class="rejectUnauthorized ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-amber-700 dark:text-amber-400 font-bold'"
+                        @click="rejectUnauthorized = !rejectUnauthorized"
+                        :title="rejectUnauthorized ? 'SSL Verification Enabled (Strict)' : 'SSL Verification Disabled (Self-Signed Allowed)'"
+                        class="px-2 py-0.5 rounded text-xs flex items-center gap-1 transition-colors font-medium border"
+                        :class="rejectUnauthorized 
+                            ? 'border-green-600/30 text-green-500 bg-green-500/10' 
+                            : 'border-amber-500/30 text-amber-500 bg-amber-500/10'"
                     >
                         <svg v-if="rejectUnauthorized" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -306,6 +320,79 @@
                 </div>
             </div>
         </div>
+
+        <!-- Cookie Manager Modal -->
+        <div v-if="showCookieModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] text-[var(--vscode-foreground)] rounded-lg shadow-xl w-full max-w-3xl flex flex-col p-4 gap-3 max-h-[85vh]">
+                <div class="flex justify-between items-center border-b border-[var(--vscode-panel-border)] pb-2">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        🍪 Cookie Jar Manager
+                    </h3>
+                    <ReqButton variant="icon" title="Close" @click="showCookieModal = false">
+                        ✕
+                    </ReqButton>
+                </div>
+                
+                <div class="flex items-center gap-2 flex-wrap">
+                    <label class="text-xs font-medium">Active Jar:</label>
+                    <vscode-single-select :value="selectedJarName" @change="selectedJarName = $event.target.value" class="w-44">
+                        <vscode-option v-for="jar in jarNames" :key="jar" :value="jar">{{ jar }}</vscode-option>
+                    </vscode-single-select>
+                    <ReqButton variant="subtle" @click="showNewJarInput = !showNewJarInput">
+                        + New Jar
+                    </ReqButton>
+                    <div class="grow"></div>
+                    <ReqButton variant="danger" @click="clearCurrentJar" :disabled="currentJarCookies.length === 0">
+                        Clear Jar
+                    </ReqButton>
+                    <ReqButton variant="danger" @click="deleteCurrentJar" :disabled="selectedJarName === 'Default Jar'">
+                        Delete Jar
+                    </ReqButton>
+                </div>
+
+                <!-- New Jar Input Row -->
+                <div v-if="showNewJarInput" class="flex gap-2 items-center bg-[var(--vscode-editorWidget-background)] p-2 rounded border border-[var(--vscode-panel-border)]">
+                    <vscode-textfield v-model="newJarName" placeholder="e.g. user1_session" class="grow"></vscode-textfield>
+                    <ReqButton @click="createNewJar">Create</ReqButton>
+                    <ReqButton variant="secondary" @click="showNewJarInput = false">Cancel</ReqButton>
+                </div>
+
+                <!-- Cookie List Table -->
+                <div class="grow overflow-auto border border-[var(--vscode-panel-border)] rounded p-2 text-xs min-h-[200px]">
+                    <div v-if="currentJarCookies.length === 0" class="text-center text-[var(--vscode-descriptionForeground)] py-12">
+                        No cookies in "{{ selectedJarName }}". Response Set-Cookie headers will be saved here automatically.
+                    </div>
+                    <table v-else class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-[var(--vscode-panel-border)] text-[var(--vscode-descriptionForeground)] font-medium">
+                                <th class="py-1 px-2">Name</th>
+                                <th class="py-1 px-2">Value</th>
+                                <th class="py-1 px-2">Domain</th>
+                                <th class="py-1 px-2">Path</th>
+                                <th class="py-1 px-2 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(cookie, idx) in currentJarCookies" :key="idx" class="border-b border-[var(--vscode-panel-border)]/40 hover:bg-[var(--vscode-toolbar-hoverBackground)]">
+                                <td class="py-1.5 px-2 font-mono font-semibold">{{ cookie.name }}</td>
+                                <td class="py-1.5 px-2 font-mono text-[11px] truncate max-w-[240px]" :title="cookie.value">{{ cookie.value }}</td>
+                                <td class="py-1.5 px-2 text-[11px]">{{ cookie.domain }}</td>
+                                <td class="py-1.5 px-2 text-[11px]">{{ cookie.path }}</td>
+                                <td class="py-1.5 px-2 text-right">
+                                    <ReqButton variant="icon" @click="deleteCookie(idx)" title="Delete Cookie">
+                                        ✕
+                                    </ReqButton>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex justify-end pt-2 border-t border-[var(--vscode-panel-border)]">
+                    <ReqButton @click="showCookieModal = false">Done</ReqButton>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -328,6 +415,65 @@ const headers = ref([{ key: '', value: '', enabled: true }]);
 
     // SSL Verification State
     const rejectUnauthorized = ref(true);
+
+    // Cookie Jar State
+    const cookieJars = ref({ 'Default Jar': [] });
+    const selectedJarName = ref('Default Jar');
+    const showCookieModal = ref(false);
+    const showNewJarInput = ref(false);
+    const newJarName = ref('');
+
+    const jarNames = computed(() => Object.keys(cookieJars.value));
+
+    const currentJarCookies = computed(() => {
+        return cookieJars.value[selectedJarName.value] || [];
+    });
+
+    function createNewJar() {
+        const name = newJarName.value.trim();
+        if (!name) return;
+        if (!cookieJars.value[name]) {
+            cookieJars.value[name] = [];
+        }
+        selectedJarName.value = name;
+        newJarName.value = '';
+        showNewJarInput.value = false;
+        saveCookieJarsToExtension();
+    }
+
+    function clearCurrentJar() {
+        if (selectedJarName.value && cookieJars.value[selectedJarName.value]) {
+            cookieJars.value[selectedJarName.value] = [];
+            saveCookieJarsToExtension();
+        }
+    }
+
+    function deleteCurrentJar() {
+        if (selectedJarName.value === 'Default Jar') return;
+        delete cookieJars.value[selectedJarName.value];
+        selectedJarName.value = 'Default Jar';
+        saveCookieJarsToExtension();
+    }
+
+    function deleteCookie(index) {
+        const jar = cookieJars.value[selectedJarName.value];
+        if (jar && jar[index]) {
+            jar.splice(index, 1);
+            saveCookieJarsToExtension();
+        }
+    }
+
+    function saveCookieJarsToExtension() {
+        if (vscode) {
+            vscode.postMessage({
+                command: 'save-cookie-jars',
+                store: {
+                    activeJar: selectedJarName.value,
+                    jars: cookieJars.value
+                }
+            });
+        }
+    }
 
     // Auth Tab State
     const authType = ref('none');
@@ -460,6 +606,14 @@ onMounted(() => {
     window.addEventListener('message', (event) => {
         const message = event.data;
         switch (message.command) {
+            case 'cookie-jars-updated':
+                if (message.store && message.store.jars) {
+                    cookieJars.value = message.store.jars;
+                    if (message.store.activeJar && cookieJars.value[message.store.activeJar]) {
+                        selectedJarName.value = message.store.activeJar;
+                    }
+                }
+                break;
             case 'load-request': setRequestData(message.data); break;
             case 'save-status': console.log(message.ok ? 'Request saved!' : 'Save failed.'); break;
             case 'load-environments':
@@ -660,90 +814,22 @@ function cancelRequest() {
 
 // --- Main Send Request Logic ---
 async function sendRequest() {
-    if (!vscode) {
-        responseBody.value = 'Error: VS Code API not available.';
-        return;
-    }
-
+    if (!vscode) return;
     isSending.value = true;
-
-    // 1. Collect active params (leave URL raw so backend can substitute env vars)
-    const activeParams = params.value
-        .filter(p => p.enabled && p.key)
-        .map(p => ({ key: p.key, value: p.value, enabled: p.enabled }));
-
-    // 2. Build Headers & Auth
-    const reqHeaders = {};
-    headers.value.filter(h => h.enabled && h.key).forEach(h => { reqHeaders[h.key] = h.value; });
-
-    if (authType.value === 'bearer' && authBearerToken.value) {
-        reqHeaders['Authorization'] = `Bearer ${authBearerToken.value}`;
-    } else if (authType.value === 'basic' && (authBasicUsername.value || authBasicPassword.value)) {
-        try {
-            const b64 = btoa(`${authBasicUsername.value}:${authBasicPassword.value}`);
-            reqHeaders['Authorization'] = `Basic ${b64}`;
-        } catch {
-            /* ignore */
-        }
-    } else if (authType.value === 'apiKey' && authApiKeyName.value && authApiKeyValue.value) {
-        if (authApiKeyAddTo.value === 'query') {
-            activeParams.push({ key: authApiKeyName.value, value: authApiKeyValue.value, enabled: true });
-        } else {
-            reqHeaders[authApiKeyName.value] = authApiKeyValue.value;
-        }
-    }
-    
-    const hasContentType = Object.keys(reqHeaders).some(h => h.toLowerCase() === 'content-type');
-    if (!hasContentType && bodyType.value !== 'none' && bodyType.value !== 'raw') {
-        reqHeaders['Content-Type'] = bodyType.value;
-    }
-    
-    // 3. Build Body based on type
-    let reqBodyPayload;
-    switch (bodyType.value) {
-        case 'application/x-www-form-urlencoded':
-            reqBodyPayload = new URLSearchParams(
-                bodyUrlEncoded.value.filter(p => p.enabled && p.key).map(p => [p.key, p.value])
-            ).toString();
-            break;
-        case 'multipart/form-data':
-        case 'application/octet-stream':
-            // ** THE FIX IS HERE **
-            // We create a plain, "clonable" copy of the reactive data.
-            const dataToSend = bodyType.value === 'multipart/form-data' 
-                ? bodyMultipart.value.filter(p => p.enabled && p.key) 
-                : bodyBinaryFile.value;
-
-            reqBodyPayload = {
-                type: bodyType.value,
-                data: JSON.parse(JSON.stringify(dataToSend)) // Convert to plain object
-            };
-            break;
-        case 'none':
-            reqBodyPayload = undefined;
-            break;
-        default: // raw, text, json, xml
-            reqBodyPayload = bodyText.value;
-            break;
-    }
-
-    // 4. Reset UI and send message (no changes here)
+    responseBody.value = 'Sending request...';
+    responseHeaders.value = null;
     statusCode.value = null;
     responseTime.value = null;
-    responseBody.value = 'Sending...';
-    responseHeaders.value = null;
     requestStartTime = performance.now();
+    chunkBuffers = [];
 
-    vscode.postMessage({
-        command: 'send-request',
-        method: method.value,
-        url: url.value,
-        params: activeParams,
-        headers: reqHeaders,
-        body: (['GET', 'HEAD'].includes(method.value) || !reqBodyPayload) ? undefined : reqBodyPayload,
-        envFile: selectedEnvFile.value,
-        rejectUnauthorized: rejectUnauthorized.value
-    });
+    const requestPayload = {
+        ...getRequestData(),
+        rejectUnauthorized: rejectUnauthorized.value,
+        cookieJarName: selectedJarName.value
+    };
+
+    vscode.postMessage({ command: 'send-request', ...requestPayload });
 }
 
 // Helper functions for response streaming
