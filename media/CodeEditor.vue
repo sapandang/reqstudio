@@ -51,28 +51,48 @@
             </div>
         </div>
 
-        <!-- Search Bar Popup -->
-        <div v-if="showSearch" class="search-bar flex items-center gap-2 px-2 py-1 bg-[var(--vscode-editorWidget-background,var(--vscode-editor-background))] border-b border-[var(--vscode-panel-border)] shadow-sm">
-            <input 
-                ref="searchInputRef" 
-                v-model="searchQuery" 
-                @keydown.esc="showSearch = false"
-                @keydown.enter.prevent="nextMatch"
-                placeholder="Find in code..." 
-                class="search-input text-xs px-2 py-0.5 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] outline-none focus:border-[var(--vscode-focusBorder)] grow"
-            />
-            <span class="text-[11px] text-[var(--vscode-descriptionForeground)] font-mono min-w-[50px] text-center">
-                {{ matches.length > 0 ? `${currentMatchIndex + 1}/${matches.length}` : 'No results' }}
-            </span>
-            <button @click="prevMatch" title="Previous Match (Shift+Enter)" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
-            </button>
-            <button @click="nextMatch" title="Next Match (Enter)" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-            </button>
-            <button @click="showSearch = false" title="Close Search" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+        <!-- Search & Replace Bar Popup -->
+        <div v-if="showSearch" class="search-bar flex flex-col gap-1.5 px-2 py-1.5 bg-[var(--vscode-editorWidget-background,var(--vscode-editor-background))] border-b border-[var(--vscode-panel-border)] shadow-sm">
+            <!-- Row 1: Find Input & Nav -->
+            <div class="flex items-center gap-2">
+                <input 
+                    ref="searchInputRef" 
+                    v-model="searchQuery" 
+                    @keydown.esc="showSearch = false"
+                    @keydown.enter.prevent="nextMatch"
+                    placeholder="Find in code..." 
+                    class="search-input text-xs px-2 py-0.5 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] outline-none focus:border-[var(--vscode-focusBorder)] grow"
+                />
+                <span class="text-[11px] text-[var(--vscode-descriptionForeground)] font-mono min-w-[50px] text-center">
+                    {{ matches.length > 0 ? `${currentMatchIndex + 1}/${matches.length}` : 'No results' }}
+                </span>
+                <button @click="prevMatch" title="Previous Match (Shift+Enter)" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                </button>
+                <button @click="nextMatch" title="Next Match (Enter)" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <button @click="showSearch = false" title="Close Search" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Row 2: Replace Input & Action Buttons (Editable Mode Only) -->
+            <div v-if="!readonly" class="flex items-center gap-2 pt-1 border-t border-[var(--vscode-panel-border)]/50">
+                <input 
+                    v-model="replaceQuery" 
+                    @keydown.esc="showSearch = false"
+                    @keydown.enter.prevent="replaceMatch"
+                    placeholder="Replace with..." 
+                    class="search-input text-xs px-2 py-0.5 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] outline-none focus:border-[var(--vscode-focusBorder)] grow"
+                />
+                <ReqButton variant="subtle" @click="replaceMatch" title="Replace Current Match" :disabled="matches.length === 0">
+                    Replace
+                </ReqButton>
+                <ReqButton variant="subtle" @click="replaceAllMatches" title="Replace All Matches" :disabled="matches.length === 0">
+                    Replace All
+                </ReqButton>
+            </div>
         </div>
 
         <!-- Main Code Body (Gutter + Editor/Viewer) -->
@@ -90,6 +110,7 @@
                     ref="textareaRef"
                     :value="localCode"
                     @input="onInput"
+                    @keydown="onKeydown"
                     @scroll="onScroll"
                     :placeholder="placeholder"
                     spellcheck="false"
@@ -112,6 +133,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
+import ReqButton from './ReqButton.vue';
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
@@ -125,14 +147,101 @@ const emit = defineEmits(['update:modelValue']);
 const localCode = ref(props.modelValue || '');
 const isWordWrap = ref(false);
 
+// Undo / Redo History Stack
+const undoStack = ref([]);
+const redoStack = ref([]);
+let isInternalChange = false;
+let historyTimer = null;
+
 watch(() => props.modelValue, (newVal) => {
-    localCode.value = newVal || '';
+    const val = newVal || '';
+    localCode.value = val;
+    if (!isInternalChange) {
+        if (undoStack.value.length === 0 || undoStack.value[undoStack.value.length - 1] !== val) {
+            undoStack.value.push(val);
+            redoStack.value = [];
+        }
+    }
+    isInternalChange = false;
 }, { immediate: true });
+
+function recordHistory(val) {
+    if (historyTimer) clearTimeout(historyTimer);
+    historyTimer = setTimeout(() => {
+        if (undoStack.value.length === 0 || undoStack.value[undoStack.value.length - 1] !== val) {
+            undoStack.value.push(val);
+            if (undoStack.value.length > 100) undoStack.value.shift();
+            redoStack.value = [];
+        }
+    }, 300);
+}
+
+function onInput(e) {
+    const val = e.target.value;
+    localCode.value = val;
+    isInternalChange = true;
+    emit('update:modelValue', val);
+    recordHistory(val);
+}
+
+function onKeydown(e) {
+    // Ctrl+Z or Cmd+Z (Undo)
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (undoStack.value.length > 1) {
+            const current = undoStack.value.pop();
+            redoStack.value.push(current);
+            const prev = undoStack.value[undoStack.value.length - 1];
+            localCode.value = prev;
+            isInternalChange = true;
+            emit('update:modelValue', prev);
+        }
+        return;
+    }
+
+    // Ctrl+Y or Cmd+Shift+Z or Ctrl+Shift+Z (Redo)
+    if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
+        e.preventDefault();
+        if (redoStack.value.length > 0) {
+            const next = redoStack.value.pop();
+            undoStack.value.push(next);
+            localCode.value = next;
+            isInternalChange = true;
+            emit('update:modelValue', next);
+        }
+        return;
+    }
+
+    // Tab key support (inserts 2 spaces)
+    if (e.key === 'Tab' && !props.readonly) {
+        e.preventDefault();
+        const start = e.target.selectionStart;
+        const end = e.target.selectionEnd;
+        const text = localCode.value;
+        const updated = text.substring(0, start) + '  ' + text.substring(end);
+        localCode.value = updated;
+        isInternalChange = true;
+        emit('update:modelValue', updated);
+        
+        if (undoStack.value[undoStack.value.length - 1] !== updated) {
+            undoStack.value.push(updated);
+            redoStack.value = [];
+        }
+
+        nextTick(() => {
+            if (textareaRef.value) {
+                textareaRef.value.selectionStart = textareaRef.value.selectionEnd = start + 2;
+            }
+        });
+        return;
+    }
+}
 
 const formatError = ref('');
 const copyStatus = ref('Copy');
 const showSearch = ref(false);
 const searchQuery = ref('');
+const replaceQuery = ref('');
 const currentMatchIndex = ref(0);
 
 const textareaRef = ref(null);
@@ -146,10 +255,7 @@ const lineCount = computed(() => {
     return val.split('\n').length;
 });
 
-function onInput(e) {
-    localCode.value = e.target.value;
-    emit('update:modelValue', e.target.value);
-}
+
 
 function onScroll(e) {
     const scrollTop = e.target.scrollTop;
@@ -243,11 +349,63 @@ const matches = computed(() => {
 function nextMatch() {
     if (matches.value.length === 0) return;
     currentMatchIndex.value = (currentMatchIndex.value + 1) % matches.value.length;
+    scrollToMatch();
 }
 
 function prevMatch() {
     if (matches.value.length === 0) return;
     currentMatchIndex.value = (currentMatchIndex.value - 1 + matches.value.length) % matches.value.length;
+    scrollToMatch();
+}
+
+function replaceMatch() {
+    if (props.readonly || !searchQuery.value || matches.value.length === 0) return;
+    const q = searchQuery.value;
+    const rep = replaceQuery.value;
+    const matchIdx = matches.value[currentMatchIndex.value];
+    if (matchIdx !== undefined) {
+        const text = localCode.value;
+        const updated = text.substring(0, matchIdx) + rep + text.substring(matchIdx + q.length);
+        localCode.value = updated;
+        isInternalChange = true;
+        emit('update:modelValue', updated);
+        
+        if (undoStack.value[undoStack.value.length - 1] !== updated) {
+            undoStack.value.push(updated);
+            redoStack.value = [];
+        }
+        
+        if (currentMatchIndex.value >= matches.value.length) {
+            currentMatchIndex.value = Math.max(0, matches.value.length - 1);
+        }
+        scrollToMatch();
+    }
+}
+
+function replaceAllMatches() {
+    if (props.readonly || !searchQuery.value || matches.value.length === 0) return;
+    const q = searchQuery.value;
+    const rep = replaceQuery.value;
+    const escapedRegex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const updated = localCode.value.replace(escapedRegex, rep);
+    localCode.value = updated;
+    isInternalChange = true;
+    emit('update:modelValue', updated);
+    
+    if (undoStack.value[undoStack.value.length - 1] !== updated) {
+        undoStack.value.push(updated);
+        redoStack.value = [];
+    }
+}
+
+function scrollToMatch() {
+    nextTick(() => {
+        if (!preRef.value) return;
+        const activeMark = preRef.value.querySelector('mark.token-search-match-active') || preRef.value.querySelector('mark.token-search-match');
+        if (activeMark) {
+            activeMark.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+        }
+    });
 }
 
 function escapeHtml(str) {
@@ -260,14 +418,34 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-function highlightTokens(code, lang) {
+function highlightTokens(code, lang, searchQuery = '', activeIndex = 0) {
     if (!code) return '';
-    const escaped = escapeHtml(code);
+    let escaped = escapeHtml(code);
 
+    // 1. Mark Search Matches with Placeholder Delimiters BEFORE Syntax Highlighting
+    const placeholders = [];
+    if (searchQuery) {
+        const escapedQuery = escapeHtml(searchQuery);
+        if (escapedQuery) {
+            const escapedRegex = new RegExp(`(${escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            let matchCounter = 0;
+            escaped = escaped.replace(escapedRegex, (m) => {
+                const isCurrent = matchCounter === activeIndex;
+                matchCounter++;
+                const cls = isCurrent ? 'token-search-match-active' : 'token-search-match';
+                const placeholder = `\uE000_${placeholders.length}_\uE001`;
+                placeholders.push(`<mark class="${cls}">${m}</mark>`);
+                return placeholder;
+            });
+        }
+    }
+
+    // 2. Perform Language Syntax Highlighting
     if (lang === 'json' || (code.trim().startsWith('{') || code.trim().startsWith('['))) {
-        return escaped.replace(
-            /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+        escaped = escaped.replace(
+            /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|\b\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?\b)/g,
             (match) => {
+                if (match.includes('\uE000')) return match;
                 let cls = 'token-number';
                 if (/^"/.test(match)) {
                     cls = /:$/.test(match) ? 'token-key' : 'token-string';
@@ -279,13 +457,18 @@ function highlightTokens(code, lang) {
                 return `<span class="${cls}">${match}</span>`;
             }
         );
-    }
-
-    if (lang === 'xml' || lang === 'html' || code.trim().startsWith('<')) {
-        return escaped
+    } else if (lang === 'xml' || lang === 'html' || code.trim().startsWith('<')) {
+        escaped = escaped
             .replace(/(&lt;\/?[a-zA-Z0-9:-]+)/g, '<span class="token-tag">$1</span>')
             .replace(/([a-zA-Z0-9:-]+)=/g, '<span class="token-attr">$1</span>=')
             .replace(/(&quot;.*?&quot;)/g, '<span class="token-string">$1</span>');
+    }
+
+    // 3. Restore Search Match Placeholders
+    if (placeholders.length > 0) {
+        escaped = escaped.replace(/\uE000_(\d+)_\uE001/g, (all, idx) => {
+            return placeholders[parseInt(idx, 10)] || all;
+        });
     }
 
     return escaped;
@@ -293,18 +476,10 @@ function highlightTokens(code, lang) {
 
 const renderedCode = computed(() => {
     const raw = localCode.value || '';
-    const highlighted = highlightTokens(raw, props.language);
-    
     if (!showSearch.value || !searchQuery.value) {
-        return highlighted;
+        return highlightTokens(raw, props.language);
     }
-
-    // Apply Search Highlight overlay if active
-    const q = searchQuery.value;
-    if (!q) return highlighted;
-
-    const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return highlighted.replace(regex, '<mark class="token-search-match">$1</mark>');
+    return highlightTokens(raw, props.language, searchQuery.value, currentMatchIndex.value);
 });
 </script>
 
@@ -388,9 +563,21 @@ const renderedCode = computed(() => {
 }
 
 :deep(.token-search-match) {
-    background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 179, 8, 0.4));
-    color: var(--vscode-editor-foreground);
-    outline: 1px solid var(--vscode-editor-findMatchBorder, #eab308);
+    background-color: var(--vscode-editor-findMatchHighlightBackground, #f59e0b) !important;
+    color: #000000 !important;
+    outline: 1px solid var(--vscode-editor-findMatchBorder, #d97706) !important;
     border-radius: 2px;
+    font-weight: 600 !important;
+    padding: 0 1px;
+}
+
+:deep(.token-search-match-active) {
+    background-color: var(--vscode-editor-findMatchBackground, #ea580c) !important;
+    color: #ffffff !important;
+    outline: 2px solid var(--vscode-focusBorder, #3b82f6) !important;
+    border-radius: 2px;
+    font-weight: 700 !important;
+    padding: 0 2px;
+    box-shadow: 0 0 4px rgba(234, 88, 12, 0.8);
 }
 </style>
