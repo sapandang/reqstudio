@@ -20,6 +20,9 @@
                         <vscode-option value="POST">POST</vscode-option>
                         <vscode-option value="PUT">PUT</vscode-option>
                         <vscode-option value="DELETE">DELETE</vscode-option>
+                        <vscode-option value="PATCH">PATCH</vscode-option>
+                        <vscode-option value="HEAD">HEAD</vscode-option>
+                        <vscode-option value="OPTIONS">OPTIONS</vscode-option>
                     </vscode-single-select>
                     <vscode-textfield v-model="url" placeholder="http://localhost:3000" class="grow"></vscode-textfield>
                     <vscode-button v-if="!isSending" @click="sendRequest">Send</vscode-button>
@@ -550,7 +553,7 @@ async function sendRequest() {
         url: url.value,
         params: activeParams,
         headers: reqHeaders,
-        body: (method.value === 'GET' || !reqBodyPayload) ? undefined : reqBodyPayload,
+        body: (['GET', 'HEAD'].includes(method.value) || !reqBodyPayload) ? undefined : reqBodyPayload,
         envFile: selectedEnvFile.value
     });
 }

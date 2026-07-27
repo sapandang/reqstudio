@@ -284,7 +284,7 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                     const res = await fetch(message.url, {
                         method,
                         headers: finalHeaders,
-                        body: method === 'GET' ? undefined : processedBody,
+                        body: (method === 'GET' || method === 'HEAD') ? undefined : processedBody,
                         signal: controller.signal
                     }) as Response;
 
