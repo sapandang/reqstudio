@@ -56,20 +56,31 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
     }
 
     private async _scanEnvFiles(reqUri: vscode.Uri): Promise<{ name: string; file: string }[]> {
-        const results: { name: string; file: string }[] = [];
-        const dir = path.dirname(reqUri.fsPath);
-        try {
-            const files = await fs.promises.readdir(dir);
-            for (const file of files) {
-                if (file.endsWith('.reqenv')) {
-                    const name = file === '.reqenv' ? 'default' : file.replace(/\.reqenv$/, '');
-                    results.push({ name, file: path.join(dir, file) });
+        const envMap = new Map<string, { name: string; file: string }>();
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(reqUri);
+        const rootDir = workspaceFolder ? workspaceFolder.uri.fsPath : undefined;
+        const reqDir = path.dirname(reqUri.fsPath);
+
+        const scanDir = async (dirPath: string) => {
+            try {
+                const files = await fs.promises.readdir(dirPath);
+                for (const file of files) {
+                    if (file.endsWith('.reqenv')) {
+                        const name = file === '.reqenv' ? 'default' : file.replace(/\.reqenv$/, '');
+                        envMap.set(name, { name, file: path.join(dirPath, file) });
+                    }
                 }
+            } catch {
+                /* ignore read errors */
             }
-        } catch {
-            /* ignore read errors */
+        };
+
+        if (rootDir && rootDir !== reqDir) {
+            await scanDir(rootDir);
         }
-        return results;
+        await scanDir(reqDir);
+
+        return Array.from(envMap.values());
     }
 
     private _substituteEnvVars(text: string, env: Record<string, string>): string {

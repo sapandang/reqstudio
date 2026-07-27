@@ -85,7 +85,7 @@ VS Code extensions run in a **Node.js Extension Host** process. The editor UI ru
 4. `resolveCustomEditor()`:
    - Reads `media/dist/index.html`, injects webview URIs for assets.
    - Sends `load-request` message to the webview containing `document.documentData`.
-   - Scans the same directory for `.reqenv` files and sends `load-environments`.
+   - Scans the workspace root directory and relative directory for `.reqenv` files and sends `load-environments` (relative `.reqenv` files override root ones of the same name).
 5. The Vue app receives `load-request` and calls `setRequestData()` to populate the UI.
 
 ### 4.2 Editing a Request
@@ -185,7 +185,7 @@ Environment files live next to `.req` files. Two formats are supported:
 1. **JSON** — parsed directly.
 2. **Dotenv** — `KEY=value` lines, `#` comments ignored.
 
-The extension auto-discovers files ending in `.reqenv` in the same directory as the `.req` file. A file named `.reqenv` is treated as the **default** environment.
+The extension auto-discovers files ending in `.reqenv` from both the workspace root directory and the same directory as the `.req` file. If an environment file with the same name exists in both directories, the relative file overrides the root-level file. A file named `.reqenv` is treated as the **default** environment.
 
 Example `.reqenv`:
 ```
