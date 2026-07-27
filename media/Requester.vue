@@ -1,67 +1,74 @@
 <template>
-    <div class="h-screen w-full p-2 flex flex-col gap-1 text-[var(--vscode-foreground)] bg-[var(--vscode-editor-background)]">
-        <!-- Top Toolbar -->
-        <div class="flex items-center justify-between px-2 py-1 bg-[var(--vscode-sideBar-background,var(--vscode-editorWidget-background))] text-[var(--vscode-foreground)] border border-[var(--vscode-panel-border)] rounded shadow-sm mb-1">
-            <div class="flex items-center gap-1">
-                <!-- Import Button -->
-                <button 
-                    @click="showImportModal = true" 
-                    title="Import cURL Command" 
-                    class="px-2 py-1 rounded text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-                >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    <span>Import cURL</span>
-                </button>
+    <div class="h-screen w-full p-2 flex flex-col overflow-hidden gap-1 text-[var(--vscode-foreground)] bg-[var(--vscode-editor-background)]">
+        <!-- Fixed Top Header Section -->
+        <div class="flex-none">
+            <!-- Top Toolbar -->
+            <div class="flex items-center justify-between px-2 py-1 bg-[var(--vscode-sideBar-background,var(--vscode-editorWidget-background))] text-[var(--vscode-foreground)] border border-[var(--vscode-panel-border)] rounded shadow-sm mb-1">
+                <div class="flex items-center gap-1">
+                    <!-- Import Button -->
+                    <button 
+                        @click="showImportModal = true" 
+                        title="Import cURL Command" 
+                        class="px-2 py-1 rounded text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        <span>Import cURL</span>
+                    </button>
 
-                <!-- Export Button -->
-                <button 
-                    @click="showExportModal = true" 
-                    title="Export Code Snippet" 
-                    class="px-2 py-1 rounded text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-                >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                    </svg>
-                    <span>Export Code</span>
-                </button>
+                    <!-- Export Button -->
+                    <button 
+                        @click="showExportModal = true" 
+                        title="Export Code Snippet" 
+                        class="px-2 py-1 rounded text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                        </svg>
+                        <span>Export Code</span>
+                    </button>
 
-                <div class="h-3.5 w-px bg-[var(--vscode-panel-border)] mx-1"></div>
+                    <div class="h-3.5 w-px bg-[var(--vscode-panel-border)] mx-1"></div>
 
-                <!-- SSL Verification Button -->
-                <button 
-                    @click="rejectUnauthorized = !rejectUnauthorized" 
-                    :title="rejectUnauthorized ? 'SSL Verification: Strict (Enabled)' : 'SSL Verification: Disabled (Self-signed allowed)'" 
-                    class="px-2 py-1 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-                    :class="rejectUnauthorized ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-amber-700 dark:text-amber-400 font-bold'"
-                >
-                    <svg v-if="rejectUnauthorized" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                    </svg>
-                    <span>{{ rejectUnauthorized ? 'SSL Verified' : 'SSL Off' }}</span>
-                </button>
+                    <!-- SSL Verification Button -->
+                    <button 
+                        @click="rejectUnauthorized = !rejectUnauthorized" 
+                        :title="rejectUnauthorized ? 'SSL Verification: Strict (Enabled)' : 'SSL Verification: Disabled (Self-signed allowed)'" 
+                        class="px-2 py-1 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] active:bg-[var(--vscode-toolbar-activeBackground)] transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+                        :class="rejectUnauthorized ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-amber-700 dark:text-amber-400 font-bold'"
+                    >
+                        <svg v-if="rejectUnauthorized" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                        </svg>
+                        <span>{{ rejectUnauthorized ? 'SSL Verified' : 'SSL Off' }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Description & Environment Selector -->
+            <div class="flex mb-1 gap-2 items-center">
+                <div class="w-full grow">
+                    <vscode-textfield v-model="description" placeholder="API Description" class="w-full"></vscode-textfield>
+                </div>
+                <div>
+                    <vscode-single-select v-model="selectedEnvFile" class="w-40">
+                        <vscode-option value="">-- No Env --</vscode-option>
+                        <vscode-option v-for="env in environments" :key="env.file" :value="env.file">{{ env.name }}</vscode-option>
+                    </vscode-single-select>
+                </div>
             </div>
         </div>
 
-        <div class="flex mb-1 gap-2 items-center">
-            <div class="w-full grow">
-                <vscode-textfield v-model="description" placeholder="API Description" class="w-full"></vscode-textfield>
-            </div>
-            <div>
-                <vscode-single-select v-model="selectedEnvFile" class="w-40">
-                    <vscode-option value="">-- No Env --</vscode-option>
-                    <vscode-option v-for="env in environments" :key="env.file" :value="env.file">{{ env.name }}</vscode-option>
-                </vscode-single-select>
-            </div>
-        </div>
-        <vscode-split-layout class="h-full grow">
-            <div slot="start" class="flex flex-col gap-2">
+        <!-- Main Split Panel (Flexible Height) -->
+        <vscode-split-layout class="grow h-full min-h-0 overflow-hidden">
+            <div slot="start" class="flex flex-col h-full min-h-0 overflow-hidden p-1">
 
-                <div class="flex gap-1 p-2">
+                <!-- Fixed Method + URL Bar -->
+                <div class="flex gap-1 py-1 flex-none items-center">
                     <vscode-single-select v-model="method" class="w-32">
                         <vscode-option value="GET">GET</vscode-option>
                         <vscode-option value="POST">POST</vscode-option>
@@ -76,146 +83,144 @@
                     <vscode-button v-else @click="cancelRequest" appearance="secondary">Cancel</vscode-button>
                 </div>
 
-                <div class="flex flex-row h-full">
-                    <vscode-tabs selected-index="1" class="w-full h-full grow">
-                        <vscode-tab-header slot="header">Parameters</vscode-tab-header>
-                        <vscode-tab-panel>
-                            <div v-for="(param, idx) in params" :key="idx" class="flex gap-1 px-2 py-1 items-center">
-                                <vscode-checkbox :checked="param.enabled" @change="param.enabled = $event.target.checked"></vscode-checkbox>
-                                <vscode-textfield v-model="param.key" placeholder="Key" class="grow"></vscode-textfield>
-                                <vscode-textfield v-model="param.value" placeholder="Value" class="grow"></vscode-textfield>
-                                <vscode-button appearance="icon" @click="removeParam(idx)">-</vscode-button>
-                            </div>
-                            <vscode-button @click="addParam" class="ml-8">Add Parameter</vscode-button>
-                        </vscode-tab-panel>
+                <vscode-tabs selected-index="1" class="w-full grow min-h-0 flex flex-col overflow-hidden">
+                    <vscode-tab-header slot="header">Parameters</vscode-tab-header>
+                    <vscode-tab-panel class="grow min-h-0 overflow-auto p-2">
+                        <div v-for="(param, idx) in params" :key="idx" class="flex gap-1 px-2 py-1 items-center">
+                            <vscode-checkbox :checked="param.enabled" @change="param.enabled = $event.target.checked"></vscode-checkbox>
+                            <vscode-textfield v-model="param.key" placeholder="Key" class="grow"></vscode-textfield>
+                            <vscode-textfield v-model="param.value" placeholder="Value" class="grow"></vscode-textfield>
+                            <vscode-button appearance="icon" @click="removeParam(idx)">-</vscode-button>
+                        </div>
+                        <vscode-button @click="addParam" class="ml-8">Add Parameter</vscode-button>
+                    </vscode-tab-panel>
 
-                        <vscode-tab-header slot="header">Body</vscode-tab-header>
-                        <vscode-tab-panel class="h-full flex flex-col">
-                            <div class="px-2 py-1">
-                                <vscode-single-select v-model="bodyType" id="bodytype">
-                                    <vscode-option value="none">none</vscode-option>
-                                    <vscode-option value="raw">raw</vscode-option>
-                                    <vscode-option value="text/plain">text</vscode-option>
-                                    <vscode-option value="application/json">JSON</vscode-option>
-                                    <vscode-option value="application/x-www-form-urlencoded">x-www-form-urlencoded</vscode-option>
-                                    <vscode-option value="multipart/form-data">multipart/form-data</vscode-option>
-                                    <vscode-option value="application/xml">XML</vscode-option>
-                                    <vscode-option value="application/octet-stream">Binary (File)</vscode-option>
-                                </vscode-single-select>
+                    <vscode-tab-header slot="header">Body</vscode-tab-header>
+                    <vscode-tab-panel class="grow min-h-0 flex flex-col overflow-hidden p-2">
+                        <div class="py-1 flex-none">
+                            <vscode-single-select v-model="bodyType" id="bodytype">
+                                <vscode-option value="none">none</vscode-option>
+                                <vscode-option value="raw">raw</vscode-option>
+                                <vscode-option value="text/plain">text</vscode-option>
+                                <vscode-option value="application/json">JSON</vscode-option>
+                                <vscode-option value="application/x-www-form-urlencoded">x-www-form-urlencoded</vscode-option>
+                                <vscode-option value="multipart/form-data">multipart/form-data</vscode-option>
+                                <vscode-option value="application/xml">XML</vscode-option>
+                                <vscode-option value="application/octet-stream">Binary (File)</vscode-option>
+                            </vscode-single-select>
+                        </div>
+                        
+                        <div class="grow min-h-0 h-full overflow-hidden py-1 flex flex-col">
+                            <CodeEditor 
+                                v-if="['raw', 'text/plain', 'application/json', 'application/xml'].includes(bodyType)"
+                                v-model="bodyText" 
+                                :language="requestLanguage" 
+                                placeholder="Request body..." 
+                                class="w-full h-full grow" 
+                            />
+
+                            <div v-else-if="bodyType === 'application/x-www-form-urlencoded'" class="h-full overflow-auto">
+                                <div v-for="(item, idx) in bodyUrlEncoded" :key="idx" class="flex gap-1 py-1 items-center">
+                                    <vscode-checkbox :checked="item.enabled" @change="item.enabled = $event.target.checked"></vscode-checkbox>
+                                    <vscode-textfield v-model="item.key" placeholder="Key" class="grow"></vscode-textfield>
+                                    <vscode-textfield v-model="item.value" placeholder="Value" class="grow"></vscode-textfield>
+                                    <vscode-button appearance="icon" @click="removeUrlEncoded(idx)">-</vscode-button>
+                                </div>
+                                <vscode-button @click="addUrlEncoded" class="ml-8">Add Field</vscode-button>
                             </div>
                             
-                            <div class="grow px-2 py-1 h-full">
-                                <CodeEditor 
-                                    v-if="['raw', 'text/plain', 'application/json', 'application/xml'].includes(bodyType)"
-                                    v-model="bodyText" 
-                                    :language="requestLanguage" 
-                                    placeholder="Request body..." 
-                                    class="w-full h-full min-h-[180px]" 
-                                />
-
-                                <div v-if="bodyType === 'application/x-www-form-urlencoded'">
-                                    <div v-for="(item, idx) in bodyUrlEncoded" :key="idx" class="flex gap-1 py-1 items-center">
-                                        <vscode-checkbox :checked="item.enabled" @change="item.enabled = $event.target.checked"></vscode-checkbox>
-                                        <vscode-textfield v-model="item.key" placeholder="Key" class="grow"></vscode-textfield>
-                                        <vscode-textfield v-model="item.value" placeholder="Value" class="grow"></vscode-textfield>
-                                        <vscode-button appearance="icon" @click="removeUrlEncoded(idx)">-</vscode-button>
-                                    </div>
-                                    <vscode-button @click="addUrlEncoded" class="ml-8">Add Field</vscode-button>
+                            <div v-else-if="bodyType === 'multipart/form-data'" class="h-full overflow-auto">
+                                <div v-for="(item, idx) in bodyMultipart" :key="idx" class="flex gap-1 py-1 items-center">
+                                    <vscode-checkbox :checked="item.enabled" @change="item.enabled = $event.target.checked"></vscode-checkbox>
+                                    <vscode-textfield v-model="item.key" placeholder="Key" class="w-1/3"></vscode-textfield>
+                                    <vscode-single-select v-model="item.type" class="w-24">
+                                        <vscode-option value="text">Text</vscode-option>
+                                        <vscode-option value="file">File</vscode-option>
+                                    </vscode-single-select>
+                                    <vscode-textfield v-if="item.type === 'text'" v-model="item.value" placeholder="Value" class="grow"></vscode-textfield>
+                                    <input v-if="item.type === 'file'" type="file" @change="e => handleMultipartFileChange(e, idx)" class="grow">
+                                    <vscode-button appearance="icon" @click="removeMultipart(idx)">-</vscode-button>
                                 </div>
-                                
-                                <div v-if="bodyType === 'multipart/form-data'">
-                                    <div v-for="(item, idx) in bodyMultipart" :key="idx" class="flex gap-1 py-1 items-center">
-                                        <vscode-checkbox :checked="item.enabled" @change="item.enabled = $event.target.checked"></vscode-checkbox>
-                                        <vscode-textfield v-model="item.key" placeholder="Key" class="w-1/3"></vscode-textfield>
-                                        <vscode-single-select v-model="item.type" class="w-24">
-                                            <vscode-option value="text">Text</vscode-option>
-                                            <vscode-option value="file">File</vscode-option>
-                                        </vscode-single-select>
-                                        <vscode-textfield v-if="item.type === 'text'" v-model="item.value" placeholder="Value" class="grow"></vscode-textfield>
-                                        <input v-if="item.type === 'file'" type="file" @change="e => handleMultipartFileChange(e, idx)" class="grow">
-                                        <vscode-button appearance="icon" @click="removeMultipart(idx)">-</vscode-button>
-                                    </div>
-                                    <vscode-button @click="addMultipart" class="ml-8">Add Field</vscode-button>
-                                </div>
+                                <vscode-button @click="addMultipart" class="ml-8">Add Field</vscode-button>
+                            </div>
 
-                                <div v-if="bodyType === 'application/octet-stream'">
-                                    <div class="flex gap-2 items-center">
-                                        <input type="file" @change="handleBinaryFileChange">
-                                        <span v-if="bodyBinaryFile?.name">{{ bodyBinaryFile.name }} ({{ bodyBinaryFile.size }} bytes)</span>
-                                    </div>
+                            <div v-else-if="bodyType === 'application/octet-stream'" class="h-full overflow-auto">
+                                <div class="flex gap-2 items-center">
+                                    <input type="file" @change="handleBinaryFileChange">
+                                    <span v-if="bodyBinaryFile?.name">{{ bodyBinaryFile.name }} ({{ bodyBinaryFile.size }} bytes)</span>
                                 </div>
                             </div>
-                        </vscode-tab-panel>
+                        </div>
+                    </vscode-tab-panel>
 
-                        <vscode-tab-header slot="header">Headers</vscode-tab-header>
-                        <vscode-tab-panel>
-                            <div v-for="(header, idx) in headers" :key="idx" class="flex gap-1 px-2 py-1 items-center">
-                                <vscode-checkbox :checked="header.enabled" @change="header.enabled = $event.target.checked"></vscode-checkbox>
-                                <vscode-textfield v-model="header.key" placeholder="Header" class="grow"></vscode-textfield>
-                                <vscode-textfield v-model="header.value" placeholder="Value" class="grow"></vscode-textfield>
-                                <vscode-button appearance="icon" @click="removeHeader(idx)">-</vscode-button>
-                            </div>
-                            <vscode-button @click="addHeader" class="ml-8">Add Header</vscode-button>
-                        </vscode-tab-panel>
+                    <vscode-tab-header slot="header">Headers</vscode-tab-header>
+                    <vscode-tab-panel class="grow min-h-0 overflow-auto p-2">
+                        <div v-for="(header, idx) in headers" :key="idx" class="flex gap-1 px-2 py-1 items-center">
+                            <vscode-checkbox :checked="header.enabled" @change="header.enabled = $event.target.checked"></vscode-checkbox>
+                            <vscode-textfield v-model="header.key" placeholder="Header" class="grow"></vscode-textfield>
+                            <vscode-textfield v-model="header.value" placeholder="Value" class="grow"></vscode-textfield>
+                            <vscode-button appearance="icon" @click="removeHeader(idx)">-</vscode-button>
+                        </div>
+                        <vscode-button @click="addHeader" class="ml-8">Add Header</vscode-button>
+                    </vscode-tab-panel>
 
-                        <vscode-tab-header slot="header">Auth</vscode-tab-header>
-                        <vscode-tab-panel class="p-2 flex flex-col gap-3">
-                            <div class="flex gap-2 items-center">
-                                <label class="text-xs font-medium">Auth Type:</label>
-                                <vscode-single-select v-model="authType" class="w-48">
-                                    <vscode-option value="none">Inherit / None</vscode-option>
-                                    <vscode-option value="bearer">Bearer Token</vscode-option>
-                                    <vscode-option value="basic">Basic Auth</vscode-option>
-                                    <vscode-option value="apiKey">API Key</vscode-option>
-                                </vscode-single-select>
-                            </div>
+                    <vscode-tab-header slot="header">Auth</vscode-tab-header>
+                    <vscode-tab-panel class="grow min-h-0 overflow-auto p-2 flex flex-col gap-3">
+                        <div class="flex gap-2 items-center">
+                            <label class="text-xs font-medium">Auth Type:</label>
+                            <vscode-single-select v-model="authType" class="w-48">
+                                <vscode-option value="none">Inherit / None</vscode-option>
+                                <vscode-option value="bearer">Bearer Token</vscode-option>
+                                <vscode-option value="basic">Basic Auth</vscode-option>
+                                <vscode-option value="apiKey">API Key</vscode-option>
+                            </vscode-single-select>
+                        </div>
 
-                            <div v-if="authType === 'bearer'" class="flex flex-col gap-2 max-w-lg">
-                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Bearer Token</label>
-                                <vscode-textfield v-model="authBearerToken" placeholder="Token (e.g. {{api_token}})"></vscode-textfield>
-                            </div>
+                        <div v-if="authType === 'bearer'" class="flex flex-col gap-2 max-w-lg">
+                            <label class="text-xs text-[var(--vscode-descriptionForeground)]">Bearer Token</label>
+                            <vscode-textfield v-model="authBearerToken" placeholder="Token (e.g. {{api_token}})"></vscode-textfield>
+                        </div>
 
-                            <div v-if="authType === 'basic'" class="flex flex-col gap-2 max-w-lg">
-                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Username</label>
-                                <vscode-textfield v-model="authBasicUsername" placeholder="Username"></vscode-textfield>
-                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Password</label>
-                                <vscode-textfield v-model="authBasicPassword" type="password" placeholder="Password"></vscode-textfield>
-                            </div>
+                        <div v-if="authType === 'basic'" class="flex flex-col gap-2 max-w-lg">
+                            <label class="text-xs text-[var(--vscode-descriptionForeground)]">Username</label>
+                            <vscode-textfield v-model="authBasicUsername" placeholder="Username"></vscode-textfield>
+                            <label class="text-xs text-[var(--vscode-descriptionForeground)]">Password</label>
+                            <vscode-textfield v-model="authBasicPassword" type="password" placeholder="Password"></vscode-textfield>
+                        </div>
 
-                            <div v-if="authType === 'apiKey'" class="flex flex-col gap-2 max-w-lg">
-                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Key</label>
-                                <vscode-textfield v-model="authApiKeyName" placeholder="Key Name (e.g. X-API-KEY)"></vscode-textfield>
-                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Value</label>
-                                <vscode-textfield v-model="authApiKeyValue" placeholder="Value (e.g. {{api_key}})"></vscode-textfield>
-                                <label class="text-xs text-[var(--vscode-descriptionForeground)]">Add To</label>
-                                <vscode-single-select v-model="authApiKeyAddTo" class="w-48">
-                                    <vscode-option value="header">Header</vscode-option>
-                                    <vscode-option value="query">Query Parameter</vscode-option>
-                                </vscode-single-select>
-                            </div>
-                        </vscode-tab-panel>
-                    </vscode-tabs>
-                </div>
+                        <div v-if="authType === 'apiKey'" class="flex flex-col gap-2 max-w-lg">
+                            <label class="text-xs text-[var(--vscode-descriptionForeground)]">Key</label>
+                            <vscode-textfield v-model="authApiKeyName" placeholder="Key Name (e.g. X-API-KEY)"></vscode-textfield>
+                            <label class="text-xs text-[var(--vscode-descriptionForeground)]">Value</label>
+                            <vscode-textfield v-model="authApiKeyValue" placeholder="Value (e.g. {{api_key}})"></vscode-textfield>
+                            <label class="text-xs text-[var(--vscode-descriptionForeground)]">Add To</label>
+                            <vscode-single-select v-model="authApiKeyAddTo" class="w-48">
+                                <vscode-option value="header">Header</vscode-option>
+                                <vscode-option value="query">Query Parameter</vscode-option>
+                            </vscode-single-select>
+                        </div>
+                    </vscode-tab-panel>
+                </vscode-tabs>
             </div>
 
-            <div slot="end">
-                <div class="flex flex-row gap-4 items-center mb-2 p-2">
+            <div slot="end" class="flex flex-col h-full min-h-0 overflow-hidden p-1">
+                <div class="flex flex-row gap-4 items-center flex-none mb-1 p-1 border-b border-[var(--vscode-panel-border)] text-xs">
                     <span v-if="statusCode !== null">Status: <span :class="statusCodeClass">{{ statusCode }}</span></span>
                     <span v-if="responseTime !== null">Time: {{ responseTime }} ms</span>
                 </div>
-                <vscode-tabs selected-index="0" class="w-full h-full grow p-2">
+                <vscode-tabs selected-index="0" class="w-full grow min-h-0 flex flex-col overflow-hidden">
                     <vscode-tab-header slot="header">Response Body</vscode-tab-header>
-                    <vscode-tab-panel class="h-full">
-                        <CodeEditor :modelValue="responseBody" readonly :language="responseLanguage" class="w-full h-full" />
+                    <vscode-tab-panel class="grow min-h-0 h-full overflow-hidden p-1 flex flex-col">
+                        <CodeEditor :modelValue="responseBody" readonly :language="responseLanguage" class="w-full h-full grow" />
                     </vscode-tab-panel>
                     <vscode-tab-header slot="header">Response Headers</vscode-tab-header>
-                    <vscode-tab-panel>
+                    <vscode-tab-panel class="grow min-h-0 overflow-auto p-2">
                         <div v-if="responseHeaders">
                             <div v-for="(val, key) in responseHeaders" :key="key" class="flex gap-2">
                                 <span class="font-bold">{{ key }}:</span> <span>{{ val }}</span>
                             </div>
                         </div>
-                        <div v-else>No headers</div>
+                        <div v-else class="text-xs text-[var(--vscode-descriptionForeground)]">No headers</div>
                     </vscode-tab-panel>
                 </vscode-tabs>
             </div>
@@ -472,14 +477,26 @@ onMounted(() => {
                 const all = new Uint8Array(chunkBuffers.reduce((sum, arr) => sum + arr.length, 0));
                 let offset = 0;
                 for (const arr of chunkBuffers) { all.set(arr, offset); offset += arr.length; }
-                responseBody.value = tryDecodeToString(all);
+                const rawDecoded = tryDecodeToString(all);
+                try {
+                    const parsedJson = JSON.parse(rawDecoded);
+                    responseBody.value = JSON.stringify(parsedJson, null, 2);
+                } catch {
+                    responseBody.value = rawDecoded;
+                }
                 if (requestStartTime) { responseTime.value = Math.round(performance.now() - requestStartTime); }
                 isSending.value = false;
                 break;
             case 'response':
                 statusCode.value = message.status;
-                responseBody.value = message.response;
                 responseHeaders.value = message.headers || null;
+                const rawResp = message.response || '';
+                try {
+                    const parsedJson = JSON.parse(rawResp);
+                    responseBody.value = JSON.stringify(parsedJson, null, 2);
+                } catch {
+                    responseBody.value = rawResp;
+                }
                 if (requestStartTime) { responseTime.value = Math.round(performance.now() - requestStartTime); }
                 isSending.value = false;
                 break;
@@ -738,6 +755,26 @@ function tryDecodeToString(uint8arr) {
     }
 }
 </script>
+
+<style>
+vscode-split-layout {
+    height: 100%;
+    overflow: hidden;
+}
+
+vscode-tabs {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+vscode-tab-panel {
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+}
+</style>
 
 <style scoped>
 /* Add some styling for the file input to make it blend in */
