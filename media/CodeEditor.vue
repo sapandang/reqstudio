@@ -51,28 +51,48 @@
             </div>
         </div>
 
-        <!-- Search Bar Popup -->
-        <div v-if="showSearch" class="search-bar flex items-center gap-2 px-2 py-1 bg-[var(--vscode-editorWidget-background,var(--vscode-editor-background))] border-b border-[var(--vscode-panel-border)] shadow-sm">
-            <input 
-                ref="searchInputRef" 
-                v-model="searchQuery" 
-                @keydown.esc="showSearch = false"
-                @keydown.enter.prevent="nextMatch"
-                placeholder="Find in code..." 
-                class="search-input text-xs px-2 py-0.5 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] outline-none focus:border-[var(--vscode-focusBorder)] grow"
-            />
-            <span class="text-[11px] text-[var(--vscode-descriptionForeground)] font-mono min-w-[50px] text-center">
-                {{ matches.length > 0 ? `${currentMatchIndex + 1}/${matches.length}` : 'No results' }}
-            </span>
-            <button @click="prevMatch" title="Previous Match (Shift+Enter)" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
-            </button>
-            <button @click="nextMatch" title="Next Match (Enter)" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-            </button>
-            <button @click="showSearch = false" title="Close Search" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+        <!-- Search & Replace Bar Popup -->
+        <div v-if="showSearch" class="search-bar flex flex-col gap-1.5 px-2 py-1.5 bg-[var(--vscode-editorWidget-background,var(--vscode-editor-background))] border-b border-[var(--vscode-panel-border)] shadow-sm">
+            <!-- Row 1: Find Input & Nav -->
+            <div class="flex items-center gap-2">
+                <input 
+                    ref="searchInputRef" 
+                    v-model="searchQuery" 
+                    @keydown.esc="showSearch = false"
+                    @keydown.enter.prevent="nextMatch"
+                    placeholder="Find in code..." 
+                    class="search-input text-xs px-2 py-0.5 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] outline-none focus:border-[var(--vscode-focusBorder)] grow"
+                />
+                <span class="text-[11px] text-[var(--vscode-descriptionForeground)] font-mono min-w-[50px] text-center">
+                    {{ matches.length > 0 ? `${currentMatchIndex + 1}/${matches.length}` : 'No results' }}
+                </span>
+                <button @click="prevMatch" title="Previous Match (Shift+Enter)" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                </button>
+                <button @click="nextMatch" title="Next Match (Enter)" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <button @click="showSearch = false" title="Close Search" class="p-0.5 rounded hover:bg-[var(--vscode-toolbar-hoverBackground)] text-[var(--vscode-foreground)]">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Row 2: Replace Input & Action Buttons (Editable Mode Only) -->
+            <div v-if="!readonly" class="flex items-center gap-2 pt-1 border-t border-[var(--vscode-panel-border)]/50">
+                <input 
+                    v-model="replaceQuery" 
+                    @keydown.esc="showSearch = false"
+                    @keydown.enter.prevent="replaceMatch"
+                    placeholder="Replace with..." 
+                    class="search-input text-xs px-2 py-0.5 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] outline-none focus:border-[var(--vscode-focusBorder)] grow"
+                />
+                <ReqButton variant="subtle" @click="replaceMatch" title="Replace Current Match" :disabled="matches.length === 0">
+                    Replace
+                </ReqButton>
+                <ReqButton variant="subtle" @click="replaceAllMatches" title="Replace All Matches" :disabled="matches.length === 0">
+                    Replace All
+                </ReqButton>
+            </div>
         </div>
 
         <!-- Main Code Body (Gutter + Editor/Viewer) -->
@@ -113,6 +133,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
+import ReqButton from './ReqButton.vue';
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
@@ -220,6 +241,7 @@ const formatError = ref('');
 const copyStatus = ref('Copy');
 const showSearch = ref(false);
 const searchQuery = ref('');
+const replaceQuery = ref('');
 const currentMatchIndex = ref(0);
 
 const textareaRef = ref(null);
@@ -334,6 +356,46 @@ function prevMatch() {
     if (matches.value.length === 0) return;
     currentMatchIndex.value = (currentMatchIndex.value - 1 + matches.value.length) % matches.value.length;
     scrollToMatch();
+}
+
+function replaceMatch() {
+    if (props.readonly || !searchQuery.value || matches.value.length === 0) return;
+    const q = searchQuery.value;
+    const rep = replaceQuery.value;
+    const matchIdx = matches.value[currentMatchIndex.value];
+    if (matchIdx !== undefined) {
+        const text = localCode.value;
+        const updated = text.substring(0, matchIdx) + rep + text.substring(matchIdx + q.length);
+        localCode.value = updated;
+        isInternalChange = true;
+        emit('update:modelValue', updated);
+        
+        if (undoStack.value[undoStack.value.length - 1] !== updated) {
+            undoStack.value.push(updated);
+            redoStack.value = [];
+        }
+        
+        if (currentMatchIndex.value >= matches.value.length) {
+            currentMatchIndex.value = Math.max(0, matches.value.length - 1);
+        }
+        scrollToMatch();
+    }
+}
+
+function replaceAllMatches() {
+    if (props.readonly || !searchQuery.value || matches.value.length === 0) return;
+    const q = searchQuery.value;
+    const rep = replaceQuery.value;
+    const escapedRegex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const updated = localCode.value.replace(escapedRegex, rep);
+    localCode.value = updated;
+    isInternalChange = true;
+    emit('update:modelValue', updated);
+    
+    if (undoStack.value[undoStack.value.length - 1] !== updated) {
+        undoStack.value.push(updated);
+        redoStack.value = [];
+    }
 }
 
 function scrollToMatch() {
