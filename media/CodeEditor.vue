@@ -90,6 +90,7 @@
                     ref="textareaRef"
                     :value="localCode"
                     @input="onInput"
+                    @keydown="onKeydown"
                     @scroll="onScroll"
                     :placeholder="placeholder"
                     spellcheck="false"
@@ -125,9 +126,95 @@ const emit = defineEmits(['update:modelValue']);
 const localCode = ref(props.modelValue || '');
 const isWordWrap = ref(false);
 
+// Undo / Redo History Stack
+const undoStack = ref([]);
+const redoStack = ref([]);
+let isInternalChange = false;
+let historyTimer = null;
+
 watch(() => props.modelValue, (newVal) => {
-    localCode.value = newVal || '';
+    const val = newVal || '';
+    localCode.value = val;
+    if (!isInternalChange) {
+        if (undoStack.value.length === 0 || undoStack.value[undoStack.value.length - 1] !== val) {
+            undoStack.value.push(val);
+            redoStack.value = [];
+        }
+    }
+    isInternalChange = false;
 }, { immediate: true });
+
+function recordHistory(val) {
+    if (historyTimer) clearTimeout(historyTimer);
+    historyTimer = setTimeout(() => {
+        if (undoStack.value.length === 0 || undoStack.value[undoStack.value.length - 1] !== val) {
+            undoStack.value.push(val);
+            if (undoStack.value.length > 100) undoStack.value.shift();
+            redoStack.value = [];
+        }
+    }, 300);
+}
+
+function onInput(e) {
+    const val = e.target.value;
+    localCode.value = val;
+    isInternalChange = true;
+    emit('update:modelValue', val);
+    recordHistory(val);
+}
+
+function onKeydown(e) {
+    // Ctrl+Z or Cmd+Z (Undo)
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (undoStack.value.length > 1) {
+            const current = undoStack.value.pop();
+            redoStack.value.push(current);
+            const prev = undoStack.value[undoStack.value.length - 1];
+            localCode.value = prev;
+            isInternalChange = true;
+            emit('update:modelValue', prev);
+        }
+        return;
+    }
+
+    // Ctrl+Y or Cmd+Shift+Z or Ctrl+Shift+Z (Redo)
+    if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
+        e.preventDefault();
+        if (redoStack.value.length > 0) {
+            const next = redoStack.value.pop();
+            undoStack.value.push(next);
+            localCode.value = next;
+            isInternalChange = true;
+            emit('update:modelValue', next);
+        }
+        return;
+    }
+
+    // Tab key support (inserts 2 spaces)
+    if (e.key === 'Tab' && !props.readonly) {
+        e.preventDefault();
+        const start = e.target.selectionStart;
+        const end = e.target.selectionEnd;
+        const text = localCode.value;
+        const updated = text.substring(0, start) + '  ' + text.substring(end);
+        localCode.value = updated;
+        isInternalChange = true;
+        emit('update:modelValue', updated);
+        
+        if (undoStack.value[undoStack.value.length - 1] !== updated) {
+            undoStack.value.push(updated);
+            redoStack.value = [];
+        }
+
+        nextTick(() => {
+            if (textareaRef.value) {
+                textareaRef.value.selectionStart = textareaRef.value.selectionEnd = start + 2;
+            }
+        });
+        return;
+    }
+}
 
 const formatError = ref('');
 const copyStatus = ref('Copy');
@@ -146,10 +233,7 @@ const lineCount = computed(() => {
     return val.split('\n').length;
 });
 
-function onInput(e) {
-    localCode.value = e.target.value;
-    emit('update:modelValue', e.target.value);
-}
+
 
 function onScroll(e) {
     const scrollTop = e.target.scrollTop;
