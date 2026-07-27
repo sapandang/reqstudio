@@ -79,8 +79,8 @@
                         <vscode-option value="OPTIONS">OPTIONS</vscode-option>
                     </vscode-single-select>
                     <vscode-textfield v-model="url" placeholder="http://localhost:3000" class="grow"></vscode-textfield>
-                    <vscode-button v-if="!isSending" @click="sendRequest">Send</vscode-button>
-                    <vscode-button v-else @click="cancelRequest" appearance="secondary">Cancel</vscode-button>
+                    <ReqButton v-if="!isSending" @click="sendRequest">Send</ReqButton>
+                    <ReqButton v-else @click="cancelRequest" variant="secondary">Cancel</ReqButton>
                 </div>
 
                 <vscode-tabs selected-index="1" class="w-full grow min-h-0 flex flex-col overflow-hidden">
@@ -90,9 +90,11 @@
                             <vscode-checkbox :checked="param.enabled" @change="param.enabled = $event.target.checked"></vscode-checkbox>
                             <vscode-textfield v-model="param.key" placeholder="Key" class="grow"></vscode-textfield>
                             <vscode-textfield v-model="param.value" placeholder="Value" class="grow"></vscode-textfield>
-                            <vscode-button appearance="icon" @click="removeParam(idx)">-</vscode-button>
+                            <ReqButton variant="icon" @click="removeParam(idx)" title="Remove parameter">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                            </ReqButton>
                         </div>
-                        <vscode-button @click="addParam" class="ml-8">Add Parameter</vscode-button>
+                        <ReqButton variant="subtle" @click="addParam" class="ml-8 mt-1">+ Add Parameter</ReqButton>
                     </vscode-tab-panel>
 
                     <vscode-tab-header slot="header">Body</vscode-tab-header>
@@ -124,9 +126,11 @@
                                     <vscode-checkbox :checked="item.enabled" @change="item.enabled = $event.target.checked"></vscode-checkbox>
                                     <vscode-textfield v-model="item.key" placeholder="Key" class="grow"></vscode-textfield>
                                     <vscode-textfield v-model="item.value" placeholder="Value" class="grow"></vscode-textfield>
-                                    <vscode-button appearance="icon" @click="removeUrlEncoded(idx)">-</vscode-button>
+                                    <ReqButton variant="icon" @click="removeUrlEncoded(idx)" title="Remove field">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                                    </ReqButton>
                                 </div>
-                                <vscode-button @click="addUrlEncoded" class="ml-8">Add Field</vscode-button>
+                                <ReqButton variant="subtle" @click="addUrlEncoded" class="ml-8 mt-1">+ Add Field</ReqButton>
                             </div>
                             
                             <div v-else-if="bodyType === 'multipart/form-data'" class="h-full overflow-auto">
@@ -139,9 +143,11 @@
                                     </vscode-single-select>
                                     <vscode-textfield v-if="item.type === 'text'" v-model="item.value" placeholder="Value" class="grow"></vscode-textfield>
                                     <input v-if="item.type === 'file'" type="file" @change="e => handleMultipartFileChange(e, idx)" class="grow">
-                                    <vscode-button appearance="icon" @click="removeMultipart(idx)">-</vscode-button>
+                                    <ReqButton variant="icon" @click="removeMultipart(idx)" title="Remove field">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                                    </ReqButton>
                                 </div>
-                                <vscode-button @click="addMultipart" class="ml-8">Add Field</vscode-button>
+                                <ReqButton variant="subtle" @click="addMultipart" class="ml-8 mt-1">+ Add Field</ReqButton>
                             </div>
 
                             <div v-else-if="bodyType === 'application/octet-stream'" class="h-full overflow-auto">
@@ -159,9 +165,11 @@
                             <vscode-checkbox :checked="header.enabled" @change="header.enabled = $event.target.checked"></vscode-checkbox>
                             <vscode-textfield v-model="header.key" placeholder="Header" class="grow"></vscode-textfield>
                             <vscode-textfield v-model="header.value" placeholder="Value" class="grow"></vscode-textfield>
-                            <vscode-button appearance="icon" @click="removeHeader(idx)">-</vscode-button>
+                            <ReqButton variant="icon" @click="removeHeader(idx)" title="Remove header">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                            </ReqButton>
                         </div>
-                        <vscode-button @click="addHeader" class="ml-8">Add Header</vscode-button>
+                        <ReqButton variant="subtle" @click="addHeader" class="ml-8 mt-1">+ Add Header</ReqButton>
                     </vscode-tab-panel>
 
                     <vscode-tab-header slot="header">Auth</vscode-tab-header>
@@ -236,11 +244,11 @@
                         </svg>
                         Export Code Snippet
                     </h3>
-                    <vscode-button appearance="icon" aria-label="Close" title="Close" @click="showExportModal = false">
+                    <ReqButton variant="icon" title="Close" @click="showExportModal = false">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                    </vscode-button>
+                    </ReqButton>
                 </div>
                 
                 <div class="flex gap-2 items-center">
@@ -254,9 +262,9 @@
                         <vscode-option value="java">Java (HttpClient)</vscode-option>
                     </vscode-single-select>
                     <div class="grow"></div>
-                    <vscode-button @click="copyCodeSnippet">
+                    <ReqButton @click="copyCodeSnippet">
                         {{ copyStatusText }}
-                    </vscode-button>
+                    </ReqButton>
                 </div>
                 
                 <div class="grow overflow-auto border border-[var(--vscode-panel-border)] rounded p-3 bg-[var(--vscode-textCodeBlock-background,var(--vscode-editor-background))] text-[var(--vscode-foreground)]">
@@ -275,11 +283,11 @@
                         </svg>
                         Import from cURL
                     </h3>
-                    <vscode-button appearance="icon" aria-label="Close" title="Close" @click="showImportModal = false">
+                    <ReqButton variant="icon" title="Close" @click="showImportModal = false">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                    </vscode-button>
+                    </ReqButton>
                 </div>
                 
                 <p class="text-xs text-[var(--vscode-descriptionForeground)]">
@@ -293,8 +301,8 @@
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2 border-t border-[var(--vscode-panel-border)]">
-                    <vscode-button appearance="secondary" @click="showImportModal = false">Cancel</vscode-button>
-                    <vscode-button @click="importCurlCommand">Import</vscode-button>
+                    <ReqButton variant="secondary" @click="showImportModal = false">Cancel</ReqButton>
+                    <ReqButton @click="importCurlCommand">Import</ReqButton>
                 </div>
             </div>
         </div>
@@ -307,6 +315,7 @@ import '@vscode-elements/elements';
 import { generateCode } from './codeGen.js';
 import { parseCurl } from './curlParser.js';
 import CodeEditor from './CodeEditor.vue';
+import ReqButton from './ReqButton.vue';
 
 // =========================================================================
 //  STATE, REFS, AND VARIABLES

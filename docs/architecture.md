@@ -238,6 +238,7 @@ Template
 
 Helper Components & Modules
   - `CodeEditor.vue` — Custom lightweight code editor & response viewer with line number gutter, prettifiers (JSON/XML), search bar (Ctrl+F), and VS Code theme tokens.
+  - `ReqButton.vue` — Custom styled button component with primary, secondary, subtle, icon, and danger variants using VS Code theme variables.
   - `codeGen.js` — Code snippet generator converting request data (URL, method, headers, query params, body) into multi-language snippets.
   - `curlParser.js` — Shell command tokenizer and cURL parser extracting method, URL, query params, headers, and body payloads.
 
