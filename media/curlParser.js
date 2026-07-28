@@ -332,6 +332,31 @@ export function parseCurl(curlString) {
         }
     }
 
+    // Extract Cookie header into importedCookies if present
+    const importedCookies = [];
+    const cookieHeaderIdx = headersList.findIndex(h => h.key.toLowerCase() === 'cookie');
+    if (cookieHeaderIdx !== -1) {
+        const cookieVal = headersList[cookieHeaderIdx].value;
+        let hostname = '';
+        try { hostname = new URL(cleanUrl).hostname; } catch {}
+        for (const pair of cookieVal.split(';')) {
+            const eqIdx = pair.indexOf('=');
+            if (eqIdx !== -1) {
+                const name = pair.substring(0, eqIdx).trim();
+                const value = pair.substring(eqIdx + 1).trim();
+                if (name) {
+                    importedCookies.push({
+                        name,
+                        value,
+                        domain: hostname || 'localhost',
+                        path: '/',
+                        createdAt: Date.now()
+                    });
+                }
+            }
+        }
+    }
+
     return {
         description: '',
         method,
@@ -342,6 +367,7 @@ export function parseCurl(curlString) {
         bodyText,
         bodyUrlEncoded,
         bodyMultipart,
-        auth
+        auth,
+        importedCookies
     };
 }

@@ -465,12 +465,13 @@ const headers = ref([{ key: '', value: '', enabled: true }]);
 
     function saveCookieJarsToExtension() {
         if (vscode) {
+            const rawStore = {
+                activeJar: selectedJarName.value,
+                jars: cookieJars.value
+            };
             vscode.postMessage({
                 command: 'save-cookie-jars',
-                store: {
-                    activeJar: selectedJarName.value,
-                    jars: cookieJars.value
-                }
+                store: JSON.parse(JSON.stringify(rawStore))
             });
         }
     }
@@ -526,6 +527,20 @@ const headers = ref([{ key: '', value: '', enabled: true }]);
                 authApiKeyName.value = parsed.auth.apiKey?.key || '';
                 authApiKeyValue.value = parsed.auth.apiKey?.value || '';
                 authApiKeyAddTo.value = parsed.auth.apiKey?.addTo || 'header';
+            }
+
+            if (parsed.importedCookies && parsed.importedCookies.length > 0) {
+                const currentJar = cookieJars.value[selectedJarName.value] || [];
+                for (const cookie of parsed.importedCookies) {
+                    const existingIdx = currentJar.findIndex(c => c.name === cookie.name && c.domain === cookie.domain);
+                    if (existingIdx !== -1) {
+                        currentJar[existingIdx] = cookie;
+                    } else {
+                        currentJar.push(cookie);
+                    }
+                }
+                cookieJars.value[selectedJarName.value] = currentJar;
+                saveCookieJarsToExtension();
             }
 
             curlInputText.value = '';
@@ -585,7 +600,7 @@ const headers = ref([{ key: '', value: '', enabled: true }]);
 
     watch(requestData, (newData) => {
         if (!isLoading && vscode) {
-            vscode.postMessage({ command: 'document-changed', data: newData });
+            vscode.postMessage({ command: 'document-changed', data: JSON.parse(JSON.stringify(newData)) });
         }
     }, { flush: 'sync' });
 
@@ -799,12 +814,11 @@ function getRequestData() {
 
         isLoading = false;
     }
-
-function saveRequest() {
-    if (vscode) {
-        vscode.postMessage({ command: 'save-request', data: getRequestData() });
+    function saveRequest() {
+        if (vscode) {
+            vscode.postMessage({ command: 'save-request', data: JSON.parse(JSON.stringify(getRequestData())) });
+        }
     }
-}
 
 function cancelRequest() {
     if (vscode) {
@@ -823,14 +837,15 @@ async function sendRequest() {
     requestStartTime = performance.now();
     chunkBuffers = [];
 
-    const requestPayload = {
+    const rawPayload = {
         ...getRequestData(),
         envFile: selectedEnvFile.value,
         rejectUnauthorized: rejectUnauthorized.value,
         cookieJarName: selectedJarName.value
     };
 
-    vscode.postMessage({ command: 'send-request', ...requestPayload });
+    const cleanPayload = JSON.parse(JSON.stringify(rawPayload));
+    vscode.postMessage({ command: 'send-request', ...cleanPayload });
 }
 
 // Helper functions for response streaming
