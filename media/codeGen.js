@@ -14,6 +14,67 @@ export function buildFullUrl(baseUrl, params) {
     return baseUrl + (baseUrl.includes('?') ? '&' : '?') + qs;
 }
 
+export function stripJsonComments(jsoncText) {
+    if (!jsoncText || typeof jsoncText !== 'string') return jsoncText;
+    
+    let insideString = false;
+    let stringChar = '';
+    let escaped = false;
+    let result = '';
+
+    for (let i = 0; i < jsoncText.length; i++) {
+        const char = jsoncText[i];
+        const nextChar = jsoncText[i + 1] || '';
+
+        if (escaped) {
+            result += char;
+            escaped = false;
+            continue;
+        }
+
+        if (char === '\\' && insideString) {
+            result += char;
+            escaped = true;
+            continue;
+        }
+
+        if ((char === '"' || char === "'") && !insideString) {
+            insideString = true;
+            stringChar = char;
+            result += char;
+            continue;
+        }
+
+        if (char === stringChar && insideString) {
+            insideString = false;
+            stringChar = '';
+            result += char;
+            continue;
+        }
+
+        if (!insideString) {
+            if (char === '/' && nextChar === '/') {
+                while (i < jsoncText.length && jsoncText[i] !== '\n') {
+                    i++;
+                }
+                continue;
+            }
+            if (char === '/' && nextChar === '*') {
+                i += 2;
+                while (i < jsoncText.length && !(jsoncText[i] === '*' && jsoncText[i + 1] === '/')) {
+                    i++;
+                }
+                i++;
+                continue;
+            }
+        }
+
+        result += char;
+    }
+
+    return result.replace(/,\s*([}\]])/g, '$1');
+}
+
 export function buildHeaders(headers, bodyType) {
     const headerMap = {};
     (headers || []).forEach(h => {
@@ -47,7 +108,11 @@ function getBodyContent(reqData) {
     if (!bodyType || bodyType === 'none') return null;
 
     if (['raw', 'text/plain', 'application/json', 'application/xml'].includes(bodyType)) {
-        return bodyText || '';
+        let content = bodyText || '';
+        if (bodyType === 'application/json' || content.trim().startsWith('{') || content.trim().startsWith('[')) {
+            content = stripJsonComments(content);
+        }
+        return content;
     }
 
     if (bodyType === 'application/x-www-form-urlencoded') {

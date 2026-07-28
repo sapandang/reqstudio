@@ -134,6 +134,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
 import ReqButton from './ReqButton.vue';
+import { stripJsonComments } from './codeGen.js';
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
@@ -212,6 +213,70 @@ function onKeydown(e) {
         return;
     }
 
+    // Ctrl+/ or Cmd+/ (Toggle Line Comment)
+    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        if (!textareaRef.value || props.readonly) return;
+
+        const textarea = textareaRef.value;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = localCode.value;
+
+        const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+        let lineEnd = text.indexOf('\n', end);
+        if (lineEnd === -1) lineEnd = text.length;
+
+        const selectedText = text.substring(lineStart, lineEnd);
+        const lines = selectedText.split('\n');
+        const isXml = props.language === 'xml' || text.trim().startsWith('<');
+
+        const allCommented = lines.every(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return true;
+            return isXml 
+                ? (trimmed.startsWith('<!--') && trimmed.endsWith('-->'))
+                : trimmed.startsWith('//');
+        });
+
+        const updatedLines = lines.map(line => {
+            const trimmed = line.trim();
+            if (!trimmed && lines.length > 1) return line;
+
+            if (allCommented) {
+                if (isXml) {
+                    return line.replace(/<!--\s*/, '').replace(/\s*-->/, '');
+                } else {
+                    return line.replace(/\/\/\s?/, '');
+                }
+            } else {
+                if (isXml) {
+                    return `<!-- ${line} -->`;
+                } else {
+                    return `// ${line}`;
+                }
+            }
+        });
+
+        const updated = text.substring(0, lineStart) + updatedLines.join('\n') + text.substring(lineEnd);
+        localCode.value = updated;
+        isInternalChange = true;
+        emit('update:modelValue', updated);
+
+        if (undoStack.value[undoStack.value.length - 1] !== updated) {
+            undoStack.value.push(updated);
+            redoStack.value = [];
+        }
+
+        nextTick(() => {
+            if (textareaRef.value) {
+                textareaRef.value.selectionStart = lineStart;
+                textareaRef.value.selectionEnd = lineStart + updatedLines.join('\n').length;
+            }
+        });
+        return;
+    }
+
     // Tab key support (inserts 2 spaces)
     if (e.key === 'Tab' && !props.readonly) {
         e.preventDefault();
@@ -286,7 +351,8 @@ function formatCode() {
 
     if (props.language === 'json' || code.trim().startsWith('{') || code.trim().startsWith('[')) {
         try {
-            const parsed = JSON.parse(code);
+            const cleanJson = stripJsonComments(code);
+            const parsed = JSON.parse(cleanJson);
             const formatted = JSON.stringify(parsed, null, 2);
             localCode.value = formatted;
             if (!props.readonly) {
@@ -443,9 +509,12 @@ function highlightTokens(code, lang, searchQuery = '', activeIndex = 0) {
     // 2. Perform Language Syntax Highlighting
     if (lang === 'json' || (code.trim().startsWith('{') || code.trim().startsWith('['))) {
         escaped = escaped.replace(
-            /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|\b\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?\b)/g,
+            /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(?:\s*:)?|\b(?:true|false|null)\b|\b\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?\b)/g,
             (match) => {
                 if (match.includes('\uE000')) return match;
+                if (match.startsWith('//') || match.startsWith('/*')) {
+                    return `<span class="token-comment">${match}</span>`;
+                }
                 let cls = 'token-number';
                 if (/^"/.test(match)) {
                     cls = /:$/.test(match) ? 'token-key' : 'token-string';
@@ -459,6 +528,7 @@ function highlightTokens(code, lang, searchQuery = '', activeIndex = 0) {
         );
     } else if (lang === 'xml' || lang === 'html' || code.trim().startsWith('<')) {
         escaped = escaped
+            .replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="token-comment">$1</span>')
             .replace(/(&lt;\/?[a-zA-Z0-9:-]+)/g, '<span class="token-tag">$1</span>')
             .replace(/([a-zA-Z0-9:-]+)=/g, '<span class="token-attr">$1</span>=')
             .replace(/(&quot;.*?&quot;)/g, '<span class="token-string">$1</span>');
@@ -539,6 +609,11 @@ const renderedCode = computed(() => {
 :deep(.token-key) {
     color: var(--vscode-symbolIcon-propertyForeground, var(--vscode-editor-foreground, #0451a5));
     font-weight: 600;
+}
+
+:deep(.token-comment) {
+    color: var(--vscode-token-comment, #6a9955);
+    font-style: italic;
 }
 
 :deep(.token-string) {
