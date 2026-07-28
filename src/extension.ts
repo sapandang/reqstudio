@@ -233,6 +233,67 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
         }
     }
 
+    private _stripJsonComments(jsoncText: string): string {
+        if (!jsoncText || typeof jsoncText !== 'string') return jsoncText;
+        
+        let insideString = false;
+        let stringChar = '';
+        let escaped = false;
+        let result = '';
+
+        for (let i = 0; i < jsoncText.length; i++) {
+            const char = jsoncText[i];
+            const nextChar = jsoncText[i + 1] || '';
+
+            if (escaped) {
+                result += char;
+                escaped = false;
+                continue;
+            }
+
+            if (char === '\\' && insideString) {
+                result += char;
+                escaped = true;
+                continue;
+            }
+
+            if ((char === '"' || char === "'") && !insideString) {
+                insideString = true;
+                stringChar = char;
+                result += char;
+                continue;
+            }
+
+            if (char === stringChar && insideString) {
+                insideString = false;
+                stringChar = '';
+                result += char;
+                continue;
+            }
+
+            if (!insideString) {
+                if (char === '/' && nextChar === '/') {
+                    while (i < jsoncText.length && jsoncText[i] !== '\n') {
+                        i++;
+                    }
+                    continue;
+                }
+                if (char === '/' && nextChar === '*') {
+                    i += 2;
+                    while (i < jsoncText.length && !(jsoncText[i] === '*' && jsoncText[i + 1] === '/')) {
+                        i++;
+                    }
+                    i++;
+                    continue;
+                }
+            }
+
+            result += char;
+        }
+
+        return result.replace(/,\s*([}\]])/g, '$1');
+    }
+
     private async _applyEnvToMessage(message: any): Promise<void> {
         const envFile = message.envFile as string | undefined;
         if (!envFile) { return; }
@@ -406,7 +467,11 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
         } else if (bodyType === 'application/octet-stream' && bodyBinaryFile?.base64content) {
             processedBody = Buffer.from(bodyBinaryFile.base64content, 'base64');
         } else if (['raw', 'text/plain', 'application/json', 'application/xml'].includes(bodyType)) {
-            processedBody = bodyText || '';
+            let payload = bodyText || '';
+            if (bodyType === 'application/json' || payload.trim().startsWith('{') || payload.trim().startsWith('[')) {
+                payload = this._stripJsonComments(payload);
+            }
+            processedBody = payload;
         }
 
         return { body: processedBody, headers: finalHeaders };
