@@ -169,6 +169,34 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
         return matching.map(c => `${c.name}=${c.value}`).join('; ');
     }
 
+    private _mergeCookieHeader(explicitCookieHeader: string, jarCookieHeader: string): string {
+        const map = new Map<string, string>();
+
+        if (jarCookieHeader) {
+            for (const pair of jarCookieHeader.split(';')) {
+                const eqIdx = pair.indexOf('=');
+                if (eqIdx !== -1) {
+                    map.set(pair.substring(0, eqIdx).trim(), pair.substring(eqIdx + 1).trim());
+                }
+            }
+        }
+
+        if (explicitCookieHeader) {
+            for (const pair of explicitCookieHeader.split(';')) {
+                const eqIdx = pair.indexOf('=');
+                if (eqIdx !== -1) {
+                    map.set(pair.substring(0, eqIdx).trim(), pair.substring(eqIdx + 1).trim());
+                }
+            }
+        }
+
+        const merged: string[] = [];
+        for (const [k, v] of map.entries()) {
+            merged.push(`${k}=${v}`);
+        }
+        return merged.join('; ');
+    }
+
     private _substituteEnvVars(text: string, env: Record<string, string>): string {
         if (!text) { return text; }
         return text.replace(/\{\{([^}]+)\}\}/g, (match, key) => env[key.trim()] ?? match);
@@ -448,16 +476,19 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                 try {
                     const { body: processedBody, headers: finalHeaders } = await this.prepareBodyAndHeaders(message);
 
-                    // Inject Cookies from Selected Cookie Jar
+                    // Inject & Deduplicate Cookies from Selected Cookie Jar (Explicit Request Headers Win)
                     const jarName = message.cookieJarName || 'Default Jar';
                     if (jarName !== 'none') {
-                        const cookieHeader = this._getCookiesForUrl(jarName, message.url);
-                        if (cookieHeader) {
-                            const existingCookie = Object.keys(finalHeaders).find(k => k.toLowerCase() === 'cookie');
-                            if (existingCookie) {
-                                finalHeaders[existingCookie] = `${finalHeaders[existingCookie]}; ${cookieHeader}`;
+                        const jarCookieHeader = this._getCookiesForUrl(jarName, message.url);
+                        const existingCookieKey = Object.keys(finalHeaders).find(k => k.toLowerCase() === 'cookie');
+                        const explicitCookieHeader = existingCookieKey ? finalHeaders[existingCookieKey] : '';
+                        
+                        const mergedCookieHeader = this._mergeCookieHeader(explicitCookieHeader, jarCookieHeader);
+                        if (mergedCookieHeader) {
+                            if (existingCookieKey) {
+                                finalHeaders[existingCookieKey] = mergedCookieHeader;
                             } else {
-                                finalHeaders['Cookie'] = cookieHeader;
+                                finalHeaders['Cookie'] = mergedCookieHeader;
                             }
                         }
                     }
