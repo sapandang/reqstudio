@@ -2,7 +2,7 @@
   "name": "reqstudio",
   "displayName": "reqstudio - Visual API & REST Client",
   "description": "A powerful HTTP and REST API client inside VS Code. An intuitive, open-source extension for testing and managing API requests in .req files.",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "publisher": "sapandang",
   "license": "MIT",
   "icon": "logo.png",

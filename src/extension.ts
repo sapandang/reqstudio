@@ -294,16 +294,16 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
         return result.replace(/,\s*([}\]])/g, '$1');
     }
 
-    private async _applyEnvToMessage(message: any): Promise<void> {
+    private async _applyEnvToMessage(message: any): Promise<Record<string, string>> {
         const envFile = message.envFile as string | undefined;
-        if (!envFile) { return; }
+        if (!envFile) { return {}; }
 
         let env: Record<string, string> = {};
         try {
             const content = await fs.promises.readFile(envFile, 'utf8');
             env = this._parseEnvContent(content);
         } catch {
-            return;
+            return {};
         }
 
         const sub = (text: any) => typeof text === 'string' ? this._substituteEnvVars(text, env) : text;
@@ -364,17 +364,6 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
 
         message.headers = processedHeaders;
 
-        // 5. Append Query Params to URL
-        if (Array.isArray(message.params)) {
-            const activeParams = message.params
-                .filter((p: any) => p && p.enabled && p.key)
-                .map((p: any) => [sub(p.key), sub(p.value)]);
-            if (activeParams.length > 0) {
-                const qs = new URLSearchParams(activeParams).toString();
-                message.url += (message.url.includes('?') ? '&' : '?') + qs;
-            }
-        }
-
         // 6. Substitute Body Payloads
         const bodyType = message.bodyType || 'none';
         if (['raw', 'text/plain', 'application/json', 'application/xml'].includes(bodyType)) {
@@ -406,8 +395,26 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                 }
             }
         }
+        return env;
     }
-    
+
+    /**
+     * Always append active query params to the URL, substituting {{VAR}} with the
+     * resolved environment map. Runs regardless of whether an env file was selected,
+     * so params reach the wire even with no .reqenv file.
+     */
+    private _appendQueryParamsToUrl(message: any, env: Record<string, string>): void {
+        if (!Array.isArray(message.params)) { return; }
+        const sub = (text: any) => typeof text === 'string' ? this._substituteEnvVars(text, env) : text;
+        const activeParams = message.params
+            .filter((p: any) => p && p.enabled && p.key)
+            .map((p: any) => [sub(p.key), sub(p.value)]);
+        if (activeParams.length > 0) {
+            const qs = new URLSearchParams(activeParams).toString();
+            message.url += (message.url.includes('?') ? '&' : '?') + qs;
+        }
+    }
+
     // saveCustomDocumentAs, revertCustomDocument, backupCustomDocument, openCustomDocument (No changes)
     async saveCustomDocumentAs(document: ReqDocument, destination: vscode.Uri, cancellation: vscode.CancellationToken): Promise<void> {
         const content = JSON.stringify(document.documentData, null, 2);
@@ -558,7 +565,7 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                 const generation = this._nextGeneration(webviewPanel);
                 this._cancelPendingRequest(webviewPanel);
 
-                await this._applyEnvToMessage(message);
+                await this._applyEnvToMessage(message).then(env => this._appendQueryParamsToUrl(message, env));
 
                 const controller = new AbortController();
                 this._activeControllers.set(webviewPanel, controller);
