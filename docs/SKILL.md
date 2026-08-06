@@ -57,8 +57,9 @@ A `.req` file is a **JSON document** that describes an HTTP/REST API request for
 | `bodyType` | no | `string` | Controls which body tab is active. Must be one of the allowed values. Use `none` for no body. |
 | `bodyText` | no | `string` | Raw payload. Used when `bodyType` is `raw`, `text/plain`, `application/json`, or `application/xml`. |
 | `bodyUrlEncoded` | no | `array` | Key-value pairs for `application/x-www-form-urlencoded`. Each item: `{ key, value, enabled: boolean }`. |
-| `bodyMultipart` | no | `array` | Parts for `multipart/form-data`. Each item: `{ key, value, type: "text" \| "file", enabled: boolean }`. For `type: "file"`, `value` is always `null` on disk (the file is selected in the UI, not stored in JSON). |
-| `auth` | no | `object` | Authentication configuration. `{ type: "none" \| "bearer" \| "basic" \| "apiKey", bearer: { token }, basic: { username, password }, apiKey: { key, value, addTo: "header" \| "query" } }`. |
+| `bodyMultipart` | no | `array` | Parts for `multipart/form-data`. Each item: `{ key, value, type: "text" \| "file", enabled: boolean }`. For `type: "file"`, `value` is always `null` on disk (the file is selected in the UI, not stored in JSON). At send time only, the UI replaces `value` with `{ name, size, base64content }` so the backend can rehydrate a `Buffer`. |
+| `bodyBinaryFile` | no | `object\|null` | Runtime-only (octet-stream). **Never persisted to the `.req` file** — it is injected into the `send-request` message only. Shape at send time: `{ name, size, base64content }`. Omit from saved JSON. |
+| `auth` | no | `object` | Authentication configuration. `{ type: "none" \| "bearer" \| "basic" \| "apiKey", bearer: { token }, basic: { username, password }, apiKey: { key, value, addTo: "header" \| "query" } }`. Auth headers/query are injected on every send, even with no `.reqenv` selected. |
 | `rejectUnauthorized` | no | `boolean` | SSL certificate validation flag (`true` by default, `false` to allow self-signed certificates). |
 
 ---
@@ -71,10 +72,11 @@ A `.req` file is a **JSON document** that describes an HTTP/REST API request for
    - `url` → `""`
    - `bodyType` → `none`
    - Arrays (`params`, `headers`, `bodyUrlEncoded`, `bodyMultipart`) → empty or single blank row in UI.
-3. **Environment variables** — Use `{{VAR_NAME}}` syntax anywhere in `url`, `headers`, `bodyText`, `params`, and `bodyUrlEncoded` values. The extension substitutes them at send time using a sidecar `.reqenv` file.
-4. **No file contents** — Do **not** embed base64 file data in `bodyMultipart`. Files are selected at runtime in the UI. Persist `value: null` for file parts.
+3. **Environment variables** — Use `{{VAR_NAME}}` syntax anywhere in `url`, `headers`, `bodyText`, `params`, `bodyUrlEncoded`, and `auth` values. Substitution runs at send time using a sidecar `.reqenv` file. **If no `.reqenv` is selected, `{{VAR}}` placeholders are left as-is** (no error) — structural logic (auth header injection, query-param append, Content-Type) still runs unconditionally.
+4. **No file contents** — Do **not** embed base64 file data in `bodyMultipart` or persist `bodyBinaryFile`. Files are selected at runtime in the UI and exist only in the in-memory `send-request` payload, never on disk. Persist `value: null` for multipart file parts, and omit `bodyBinaryFile` from saved JSON.
 5. **Method-body compatibility** — `GET` and `HEAD` requests typically do not send a body. REQ Studio still allows a body in the UI but strips it on the wire for `GET`. Prefer `bodyType: "none"` for `GET`.
 6. **Content-Type auto-injection** — If the user does not provide a `Content-Type` header and `bodyType` is not `none` or `raw`, the extension auto-adds `Content-Type: <bodyType>`. You can still include it explicitly if needed.
+7. **Auth works without an env file** — Bearer/Basic/apiKey headers are injected on every send regardless of whether a `.reqenv` is selected. Do not assume auth requires an env file.
 
 ---
 
@@ -231,5 +233,6 @@ blog_token=YOUR_TOKEN_HERE
 - [ ] `bodyType` matches one of the allowed strings
 - [ ] `bodyText` used only when bodyType is text-based
 - [ ] `bodyMultipart` file parts have `value: null` and `type: "file"`
+- [ ] `bodyBinaryFile` is **not** present in saved JSON (runtime-only)
 - [ ] `enabled` is boolean on every param/header/field item
-- [ ] `{{VAR}}` syntax documented with a `.reqenv` if used
+- [ ] `{{VAR}}` syntax documented with a `.reqenv` if used (placeholders are left as-is if no env file is selected)

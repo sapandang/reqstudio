@@ -109,16 +109,22 @@ VS Code extensions run in a **Node.js Extension Host** process. The editor UI ru
 
 1. User clicks **Send**.
 2. Vue posts `send-request` with:
-   - `method`, `url`, `params`, `headers`, `body`, `envFile`
+   - `method`, `url`, `params`, `headers`, `bodyType` + body fields, `auth`, `envFile`, `rejectUnauthorized`, `cookieJarName`
+   - **File content is injected only on the send path** (not via `getRequestData()`): `bodyBinaryFile` for octet-stream, and multipart `value` carrying `{ name, size, base64content }` for file parts. This keeps base64 out of the saved `.req` file.
 3. Extension host:
-   - Reads the selected `.reqenv` file.
-   - Substitutes `{{VAR}}` placeholders in URL, headers, body, and params.
-   - Appends active query params to the URL.
-   - Prepares the body:
+   - Calls `_applyEnvToMessage(message)` — **always runs**, even with no `.reqenv` selected (substitution becomes a no-op when `env` is `{}`). It:
+     - Reads the selected `.reqenv` file (if any) into an `env` map.
+     - Substitutes `{{VAR}}` placeholders in URL, params, headers, auth, and body.
+     - Normalizes headers from array form to a clean `Record<string, string>`.
+     - Injects auth headers (`Authorization: Bearer …` / `Basic …`, or `apiKey` in header/query).
+     - Auto-injects `Content-Type` for known body types.
+     - Returns the resolved `env` map.
+   - Calls `_appendQueryParamsToUrl(message, env)` — **always runs** (extracted from the env step so params reach the wire even with no env file). Substitutes `{{VAR}}` on param key/value and appends enabled params to the URL.
+   - Calls `prepareBodyAndHeaders(message)`:
      - `raw/text/json/xml` → string
      - `application/x-www-form-urlencoded` → `URLSearchParams`
-     - `multipart/form-data` → `FormData` (with file buffer rehydration from base64)
-     - `application/octet-stream` → `Buffer` from base64
+     - `multipart/form-data` → `FormData` (file buffer rehydrated from `value.base64content`)
+     - `application/octet-stream` → `Buffer` from `bodyBinaryFile.base64content`
    - Calls `node-fetch` with `AbortController` for cancellation & timeout.
 4. During the response:
    - `response-start` → status + headers sent to webview.
@@ -176,7 +182,7 @@ VS Code extensions run in a **Node.js Extension Host** process. The editor UI ru
 | `auth` | `object` | Authentication configuration (`type`, `bearer`, `basic`, `apiKey`) |
 | `rejectUnauthorized` | `boolean` | SSL certificate validation flag (`true` by default, `false` to allow self-signed certificates) |
 
-> **File uploads:** When a user selects a file in the webview, it is read via `FileReader` to base64, sent to the extension host inside the `send-request` message, and converted back to a `Buffer` before `node-fetch`. The base64 content is **not** persisted to the `.req` file.
+> **File uploads:** When a user selects a file in the webview, it is read via `FileReader` to base64 and stored in component state (`bodyBinaryFile` for octet-stream, or `bodyMultipart[i].value = { name, size, base64content }` for multipart). `getRequestData()` deliberately **strips file content** (multipart file parts get `value: null`; `bodyBinaryFile` is omitted entirely) so base64 never gets persisted to the `.req` file via the `document-changed` watch or `save-request`. The real file content is injected **only** in `sendRequest()` when building the `send-request` message, and the extension host rehydrates it back to a `Buffer` before `node-fetch`.
 
 ---
 
@@ -258,6 +264,8 @@ Script
 3. Include it in `getRequestData()` so it gets sent to the extension.
 4. Restore it in `setRequestData()` so it loads from disk.
 
+> **Exception — runtime-only file content:** `bodyBinaryFile` and multipart file `value` (which carry base64) are intentionally **not** in `getRequestData()` — that would persist base64 to the `.req` file. They are injected only in `sendRequest()` into the `send-request` payload. See section 4.4 and "Adding a New UI Field" below.
+
 ---
 
 ## 8. Backend Deep Dive (`src/extension.ts`)
@@ -285,8 +293,9 @@ Key responsibilities:
 - `resolveCustomEditor()` — builds the HTML, sets up message handlers.
 - `send-request` handler — run the HTTP request lifecycle.
 - `document-changed` / `save-request` handlers — sync state to `ReqDocument`.
-- `_applyEnvToMessage()` — env var substitution before fetch.
-- `prepareBodyAndHeaders()` — convert webview payload to Node.js-compatible fetch args.
+- `_applyEnvToMessage(message)` → `Promise<Record<string,string>>` — **always runs** (no early return when no env file). Loads `env` from the `.reqenv` (or `{}` if none), then substitutes `{{VAR}}` in URL/params/headers/auth/body, normalizes headers to a `Record`, injects auth headers, and auto-injects `Content-Type`. Returns the resolved `env` map.
+- `_appendQueryParamsToUrl(message, env)` — **always runs** after `_applyEnvToMessage()`. Substitutes `{{VAR}}` on enabled params and appends them to the URL. Extracted into its own method so params reach the wire even when no env file is selected.
+- `prepareBodyAndHeaders(message)` — convert webview payload to Node.js-compatible fetch args.
 
 ### 8.2 Request Lifecycle (Backend)
 
@@ -294,10 +303,16 @@ Key responsibilities:
 receive send-request
     |
     v
-_applyEnvToMessage()   -- substitute {{vars}}
+_applyEnvToMessage(message)         -- load env (or {}), substitute {{vars}},
+                                        normalize headers, inject auth + Content-Type
+                                        returns env map
     |
     v
-prepareBodyAndHeaders() -- build FormData / Buffer / string body
+_appendQueryParamsToUrl(message, env)  -- always: substitute + append enabled
+                                           params to URL (skipped if no enabled params)
+    |
+    v
+prepareBodyAndHeaders(message)     -- build FormData / Buffer / string body
     |
     v
 node-fetch() with AbortController
@@ -307,6 +322,8 @@ response-start  ----> webview
 response-chunk  ----> webview  (repeated)
 response-end    ----> webview
 ```
+
+> **Important:** Auth header injection, header normalization, query-param append, and Content-Type auto-injection all run **unconditionally** — they are not gated on whether a `.reqenv` file is selected. When no env file is selected, `env` is `{}` and `{{VAR}}` substitution is a no-op, but structural logic (auth injection, param append, etc.) still executes. This prevents silent auth bypass / dropped params when "No Env" is chosen.
 
 **Streaming:** The extension reads `res.body` as an async iterator, base64-encodes each chunk, and sends it individually. The webview reassembles. This avoids loading multi-megabyte responses into the extension host's memory all at once.
 
@@ -386,6 +403,8 @@ Reload the Extension Development Host.
 4. Add it to `setRequestData()` (restores from JSON).
 5. No extension.ts changes needed — the document is saved/loaded generically.
 
+> **File-content fields are an exception:** If the field carries runtime-only content (e.g. base64 file data like `bodyBinaryFile` or multipart file `value`), do **not** add it to `getRequestData()` — that would persist it to the `.req` file. Instead, inject it in `sendRequest()` only, into the `send-request` payload. See the existing `bodyBinaryFile` / `bodyMultipart` handling.
+
 ### Adding a New Setting
 1. Declare it in the root `package.json` under `contributes.configuration.properties`.
 2. Read it in `extension.ts` via `vscode.workspace.getConfiguration('reqstudio').get('key')`.
@@ -433,7 +452,11 @@ The resulting `.vsix` can be installed locally or published to the VS Code Marke
 | Webview is blank | `media/dist/` missing or stale | `cd media && npm run build` |
 | Changes to `.req` not saving | `getRequestData()` missing the new field | Add field to both getter and setter in `Requester.vue` |
 | Env vars not substituting | `.reqenv` file not in same folder as `.req` | Move env file or check filename |
-| File upload fails | Base64 not reconstructed correctly | Check `prepareBodyAndHeaders()` for the body type branch |
+| Auth header missing on the wire | (Historical) `_applyEnvToMessage()` early-returned when no env file selected | Fixed — auth/header/params logic now always runs. If recurring, check `_applyEnvToMessage()` has no env-gated early return |
+| Query params not sent | (Historical) Param append lived inside the env-gated block | Fixed — `_appendQueryParamsToUrl()` always runs after `_applyEnvToMessage()` |
+| File upload fails (octet-stream) | `bodyBinaryFile` not included in the `send-request` payload | Ensure `sendRequest()` injects `bodyBinaryFile` (not `getRequestData()`, which strips it) |
+| File upload fails (multipart) | Multipart file `value` stripped to `null` on send path | Ensure `sendRequest()` injects real `value` (`{name,size,base64content}`) for file parts |
+| File upload fails | Base64 not reconstructed correctly in backend | Check `prepareBodyAndHeaders()` for the body type branch |
 | Streaming never ends | `response-end` not sent | Ensure fetch loop completes without early return |
 | Extension host crashes | Infinite loop in message handler | Check that `watch` does not trigger a message that triggers the watch again |
 

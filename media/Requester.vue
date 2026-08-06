@@ -864,7 +864,16 @@ async function sendRequest() {
         ...getRequestData(),
         envFile: selectedEnvFile.value,
         rejectUnauthorized: rejectUnauthorized.value,
-        cookieJarName: selectedJarName.value
+        cookieJarName: selectedJarName.value,
+        // File content is intentionally excluded from getRequestData() so it is not
+        // persisted to the .req file. Inject it here for the live request only.
+        bodyBinaryFile: bodyBinaryFile.value,
+        bodyMultipart: bodyMultipart.value.map(p => ({
+            key: p.key,
+            value: p.value,
+            type: p.type,
+            enabled: p.enabled,
+        }))
     };
 
     const cleanPayload = JSON.parse(JSON.stringify(rawPayload));

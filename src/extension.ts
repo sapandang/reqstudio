@@ -296,14 +296,15 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
 
     private async _applyEnvToMessage(message: any): Promise<Record<string, string>> {
         const envFile = message.envFile as string | undefined;
-        if (!envFile) { return {}; }
 
         let env: Record<string, string> = {};
-        try {
-            const content = await fs.promises.readFile(envFile, 'utf8');
-            env = this._parseEnvContent(content);
-        } catch {
-            return {};
+        if (envFile) {
+            try {
+                const content = await fs.promises.readFile(envFile, 'utf8');
+                env = this._parseEnvContent(content);
+            } catch {
+                env = {};
+            }
         }
 
         const sub = (text: any) => typeof text === 'string' ? this._substituteEnvVars(text, env) : text;
