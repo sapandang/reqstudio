@@ -119,7 +119,7 @@
                                 <vscode-option value="raw">raw</vscode-option>
                                 <vscode-option value="text/plain">text</vscode-option>
                                 <vscode-option value="application/json">JSON</vscode-option>
-                                <vscode-option value="application/x-www-form-urlencoded">x-www-form-urlencoded</vscode-option>
+                                <vscode-option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</vscode-option>
                                 <vscode-option value="multipart/form-data">multipart/form-data</vscode-option>
                                 <vscode-option value="application/xml">XML</vscode-option>
                                 <vscode-option value="application/octet-stream">Binary (File)</vscode-option>
@@ -238,11 +238,29 @@
                     <vscode-tab-header slot="header">Response Headers</vscode-tab-header>
                     <vscode-tab-panel class="grow min-h-0 overflow-auto p-2">
                         <div v-if="responseHeaders">
-                            <div v-for="(val, key) in responseHeaders" :key="key" class="flex gap-2">
-                                <span class="font-bold">{{ key }}:</span> <span>{{ val }}</span>
+                            <div v-for="(val, key) in responseHeaders" :key="key" class="flex gap-2 text-xs">
+                                <span class="font-bold font-mono">{{ key }}:</span> <span class="font-mono break-all">{{ val }}</span>
                             </div>
                         </div>
                         <div v-else class="text-xs text-[var(--vscode-descriptionForeground)]">No headers</div>
+                    </vscode-tab-panel>
+                    <vscode-tab-header slot="header">Request Sent</vscode-tab-header>
+                    <vscode-tab-panel class="grow min-h-0 overflow-auto p-2 flex flex-col gap-2">
+                        <div v-if="sentRequestInfo" class="flex flex-col gap-2">
+                            <div class="text-xs font-bold p-1.5 bg-[var(--vscode-textCodeBlock-background)] rounded border border-[var(--vscode-panel-border)] font-mono text-[var(--vscode-symbolIcon-keywordForeground)]">
+                                {{ sentRequestInfo.method }} {{ sentRequestInfo.url }}
+                            </div>
+                            <div class="text-xs font-bold border-b border-[var(--vscode-panel-border)] pb-1 mt-1">Outgoing Headers</div>
+                            <div class="flex flex-col gap-1">
+                                <div v-for="(val, key) in sentRequestInfo.headers" :key="key" class="flex gap-2 text-xs">
+                                    <span class="font-bold font-mono text-[var(--vscode-symbolIcon-propertyForeground)]">{{ key }}:</span>
+                                    <span class="font-mono break-all">{{ val }}</span>
+                                </div>
+                            </div>
+                            <div class="text-xs font-bold border-b border-[var(--vscode-panel-border)] pb-1 mt-2">Outgoing Body</div>
+                            <pre class="text-xs font-mono whitespace-pre-wrap break-all bg-[var(--vscode-editor-background)] p-2 rounded border border-[var(--vscode-panel-border)] max-h-60 overflow-auto">{{ sentRequestInfo.body || '(no body)' }}</pre>
+                        </div>
+                        <div v-else class="text-xs text-[var(--vscode-descriptionForeground)]">No request sent yet</div>
                     </vscode-tab-panel>
                 </vscode-tabs>
             </div>
@@ -579,6 +597,7 @@ const headers = ref([{ key: '', value: '', enabled: true }]);
     const responseHeaders = ref(null);
     const statusCode = ref(null);
     const responseTime = ref(null);
+    const sentRequestInfo = ref(null);
     const isSending = ref(false);
 
     const environments = ref([]);
@@ -640,6 +659,9 @@ onMounted(() => {
                 break;
             case 'env-data':
                 currentEnvData.value = message.envData || {};
+                break;
+            case 'request-sent-info':
+                sentRequestInfo.value = message.data;
                 break;
             case 'response-start':
                 chunkBuffers = [];
@@ -834,6 +856,7 @@ async function sendRequest() {
     responseHeaders.value = null;
     statusCode.value = null;
     responseTime.value = null;
+    sentRequestInfo.value = null;
     requestStartTime = performance.now();
     chunkBuffers = [];
 

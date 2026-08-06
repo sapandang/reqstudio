@@ -430,11 +430,35 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
         return new ReqDocument(uri, fileContent);
     }
 
-    // prepareBodyAndHeaders (No changes)
+    private _normalizeHeaders(headers: any): Record<string, string> {
+        const normalized: Record<string, string> = {};
+        if (!headers) return normalized;
+
+        if (Array.isArray(headers)) {
+            for (const h of headers) {
+                if (h && typeof h === 'object' && h.key && h.enabled !== false) {
+                    normalized[String(h.key)] = String(h.value ?? '');
+                }
+            }
+        } else if (typeof headers === 'object') {
+            for (const [k, v] of Object.entries(headers)) {
+                if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+                    normalized[k] = String(v);
+                } else if (v && typeof v === 'object') {
+                    const hObj = v as any;
+                    if (hObj.key && hObj.enabled !== false) {
+                        normalized[String(hObj.key)] = String(hObj.value ?? '');
+                    }
+                }
+            }
+        }
+        return normalized;
+    }
+
     private async prepareBodyAndHeaders(message: any) {
         const { headers, bodyType, bodyText, bodyUrlEncoded, bodyMultipart, bodyBinaryFile } = message;
         let processedBody: any = undefined;
-        let finalHeaders: any = { ...headers };
+        let finalHeaders: Record<string, string> = this._normalizeHeaders(headers);
 
         if (bodyType === 'application/x-www-form-urlencoded' && Array.isArray(bodyUrlEncoded)) {
             const urlParams = new URLSearchParams();
@@ -444,6 +468,10 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                 }
             }
             processedBody = urlParams.toString();
+            const hasContentType = Object.keys(finalHeaders).some(k => k.toLowerCase() === 'content-type');
+            if (!hasContentType) {
+                finalHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+            }
         } else if (bodyType === 'multipart/form-data' && Array.isArray(bodyMultipart)) {
             const form = new FormData();
             for (const part of bodyMultipart) {
@@ -457,9 +485,9 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                 }
             }
             const cleanedHeaders: Record<string, string> = {};
-            for (const [k, v] of Object.entries(headers ?? {})) {
+            for (const [k, v] of Object.entries(finalHeaders)) {
                 if (k.toLowerCase() !== 'content-type') {
-                    cleanedHeaders[k] = v as string;
+                    cleanedHeaders[k] = v;
                 }
             }
             finalHeaders = { ...cleanedHeaders, ...form.getHeaders() };
@@ -472,6 +500,10 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
                 payload = this._stripJsonComments(payload);
             }
             processedBody = payload;
+            const hasContentType = Object.keys(finalHeaders).some(k => k.toLowerCase() === 'content-type');
+            if (!hasContentType && bodyType !== 'raw') {
+                finalHeaders['Content-Type'] = bodyType;
+            }
         }
 
         return { body: processedBody, headers: finalHeaders };
@@ -560,6 +592,25 @@ class ReqCustomEditorProvider implements vscode.CustomEditorProvider<ReqDocument
 
                     const rejectUnauthorized = message.rejectUnauthorized !== false;
                     const agent = message.url.startsWith('https:') ? new https.Agent({ rejectUnauthorized }) : undefined;
+
+                    let bodySummary: string = '';
+                    if (typeof processedBody === 'string') {
+                        bodySummary = processedBody;
+                    } else if (Buffer.isBuffer(processedBody)) {
+                        bodySummary = `[Binary Buffer: ${processedBody.length} bytes]`;
+                    } else if (processedBody !== undefined) {
+                        bodySummary = String(processedBody);
+                    }
+
+                    webviewPanel.webview.postMessage({
+                        command: 'request-sent-info',
+                        data: {
+                            url: message.url,
+                            method,
+                            headers: finalHeaders,
+                            body: bodySummary
+                        }
+                    });
 
                     const res = await fetch(message.url, {
                         method,
