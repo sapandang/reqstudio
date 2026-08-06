@@ -16,6 +16,17 @@ app.use((req, res, next) => {
     next();
 });
 
+// Echo endpoint for automated testing
+app.all('/api/echo', (req, res) => {
+    res.status(200).json({
+        method: req.method,
+        headers: req.headers,
+        body: req.body,
+        query: req.query,
+        cookies: req.headers.cookie || ''
+    });
+});
+
 // GET endpoint
 app.get('/api/test', (req, res) => {
     console.log('Query params:', req.query);
@@ -139,7 +150,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = 3456;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`TestApp server running at http://localhost:${PORT}`);
     console.log('Available endpoints:');
     console.log('  GET    /api/test');
@@ -158,3 +169,5 @@ app.listen(PORT, () => {
     console.log('  HEAD   /api/test');
     console.log('  OPTIONS /api/test');
 });
+
+module.exports = server;

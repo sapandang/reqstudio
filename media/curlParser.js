@@ -120,6 +120,31 @@ export function parseCurl(curlString) {
             continue;
         }
 
+        // Cookie flags (-b, --cookie)
+        if (token === '-b' || token === '--cookie') {
+            if (i + 1 < tokens.length) {
+                const cookieVal = tokens[++i];
+                if (cookieVal) {
+                    headersList.push({ key: 'Cookie', value: cookieVal, enabled: true });
+                }
+            }
+            continue;
+        }
+        if (token.startsWith('--cookie=')) {
+            const cookieVal = token.substring(9).trim();
+            if (cookieVal) {
+                headersList.push({ key: 'Cookie', value: cookieVal, enabled: true });
+            }
+            continue;
+        }
+        if (token.startsWith('-b') && token.length > 2) {
+            const cookieVal = token.substring(2).trim();
+            if (cookieVal) {
+                headersList.push({ key: 'Cookie', value: cookieVal, enabled: true });
+            }
+            continue;
+        }
+
         // Basic Auth flag
         if (token === '-u' || token === '--user') {
             if (i + 1 < tokens.length) {
@@ -334,9 +359,9 @@ export function parseCurl(curlString) {
 
     // Extract Cookie header into importedCookies if present
     const importedCookies = [];
-    const cookieHeaderIdx = headersList.findIndex(h => h.key.toLowerCase() === 'cookie');
-    if (cookieHeaderIdx !== -1) {
-        const cookieVal = headersList[cookieHeaderIdx].value;
+    const cookieHeaders = headersList.filter(h => h.key.toLowerCase() === 'cookie');
+    for (const cookieHeader of cookieHeaders) {
+        const cookieVal = cookieHeader.value;
         let hostname = '';
         try { hostname = new URL(cleanUrl).hostname; } catch {}
         for (const pair of cookieVal.split(';')) {
